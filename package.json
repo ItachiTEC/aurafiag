@@ -1,7 +1,9 @@
+
 {
-  "name": "vanilla-basic",
+  "name": "aura-fiag",
   "version": "1.0.0",
-  "scripts": { 
-    "start": "sirv ./src public --cors --single --no-clear --port 8000"
+  "scripts": {
+    "start": "sirv ./src public --cors --single --no-clear --port 8000",
+    "build": "node -e \"require('fs').cpSync('src', 'dist', {recursive:true})\""
   }
 }
