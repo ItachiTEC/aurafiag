@@ -1,9 +1,16 @@
-
 {
-  "name": "aura-fiag",
+  "name": "aura-fiag-web",
   "version": "1.0.0",
+  "private": true,
+  "description": "Portal informativo y participativo de AURA FIAG / UNJBG",
+  "type": "module",
   "scripts": {
-    "start": "sirv ./src public --cors --single --no-clear --port 8000",
-    "build": "node -e \"require('fs').cpSync('src', 'dist', {recursive:true})\""
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/serve.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/test-api.cjs"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
