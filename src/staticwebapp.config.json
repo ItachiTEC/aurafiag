@@ -1,0 +1,19 @@
+{
+  "platform": { "apiRuntime": "node:22" },
+  "routes": [
+    { "route": "/admin*", "allowedRoles": ["administrator"] },
+    { "route": "/api/admin/*", "allowedRoles": ["administrator"] },
+    { "route": "/api/messages", "methods": ["POST"], "allowedRoles": ["anonymous"] }
+  ],
+  "responseOverrides": {
+    "401": { "statusCode": 302, "redirect": "/.auth/login/github?post_login_redirect_uri=/admin/" },
+    "403": { "rewrite": "/403.html", "statusCode": 403 }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
+  },
+  "mimeTypes": { ".webmanifest": "application/manifest+json" }
+}

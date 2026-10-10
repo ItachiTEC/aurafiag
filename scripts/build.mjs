@@ -1,0 +1,11 @@
+import { cpSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const source = resolve(root, 'src');
+const dest = resolve(root, 'dist');
+if (!existsSync(source)) throw new Error('No existe src');
+rmSync(dest, { recursive: true, force: true });
+mkdirSync(dest, { recursive: true });
+cpSync(source, dest, { recursive: true });
+console.log('AURA: sitio generado en dist/');
