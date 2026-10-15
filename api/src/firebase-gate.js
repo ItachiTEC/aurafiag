@@ -1,11 +1,12 @@
 'use strict';
 // Verificación para todas las operaciones privadas del CMS Firebase.
 // El encabezado Authorization puede ser reescrito por Azure SWA; se usa uno propio.
-const {getApps,initializeApp}=require('firebase-admin/app');
-const {getAuth}=require('firebase-admin/auth');
 let firebaseApp;
 const response=(status,error)=>({status,jsonBody:{error},headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 function client(){
+ // Importación diferida: los tests y las rutas públicas no necesitan Admin SDK.
+ const {getApps,initializeApp}=require('firebase-admin/app');
+ const {getAuth}=require('firebase-admin/auth');
  firebaseApp=firebaseApp||getApps().find(a=>a.name==='aura-private-cms')||initializeApp({projectId:'aura-fiag'},'aura-private-cms');
  return getAuth(firebaseApp);
 }
