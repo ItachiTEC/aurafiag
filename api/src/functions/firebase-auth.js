@@ -12,15 +12,22 @@ function verifier(){
  return getAuth(firebaseApp);
 }
 app.http('firebaseAuthCheck',{route:'firebase-auth-check',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
- const header=req.headers.get('authorization')||'';
- if(!/^Bearer [^\s]{100,8192}$/.test(header))return response(401,{authenticated:false,authorized:false});
+ // SWA can replace the Authorization header with its own platform token.
+ // Only a distinct application header can carry the Firebase ID token reliably.
+ const token=req.headers.get('x-aura-firebase-token')||'';
+ if(!/^[^\s]{100,8192}$/.test(token))return response(401,{authenticated:false,authorized:false,reason:'firebase-token-missing'});
  try{
-  const claims=await verifier().verifyIdToken(header.slice(7));
+  const claims=await verifier().verifyIdToken(token);
   if(!claims.email_verified)return response(403,{authenticated:true,authorized:false,reason:'verify-email'});
   const role=ROLES.has(claims.aura_role)?claims.aura_role:null;
   return response(200,{authenticated:true,authorized:Boolean(role),role});
  }catch(error){
-  if(String(error.code||'').startsWith('auth/'))return response(401,{authenticated:false,authorized:false});
+  // Invalid session tokens are user errors; unavailable Firebase Admin
+  // credentials/project configuration must NOT be reported as a bad password.
+  const code=String(error.code||'');
+  if(['auth/invalid-id-token','auth/id-token-expired','auth/id-token-revoked','auth/argument-error'].includes(code)){
+   return response(401,{authenticated:false,authorized:false,reason:'firebase-token-invalid'});
+  }
   context.error('Firebase auth check unavailable: '+String(error.code||error.name||'service'));
   return response(503,{error:'No se pudo verificar Firebase en este momento.'});
  }
