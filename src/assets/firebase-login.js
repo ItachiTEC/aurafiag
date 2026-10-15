@@ -5,9 +5,9 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-
 import {getAuth,signInWithEmailAndPassword,sendPasswordResetEmail,sendEmailVerification,signOut,onAuthStateChanged,reload} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {firebaseConfig} from '/assets/firebase-config.js';
 
-window.__auraFirebaseModuleReady=true;
 const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
+window.__auraFirebaseModuleReady=true;
 auth.languageCode='es';
 const byId=id=>document.getElementById(id);
 const form=byId('firebase-login-form');
