@@ -22,6 +22,7 @@ export const navigation = [
   { href:'/conocenos/', label:'AURA', key:'conocenos' },
   { href:'/participa/', label:'Participa', key:'participa' },
   { href:'/equipo/', label:'Equipo', key:'equipo' },
+  { href:'/entradas/', label:'Novedades', key:'entradas' },
   { href:'/recursos/', label:'Recursos', key:'recursos' }
 ];
 
