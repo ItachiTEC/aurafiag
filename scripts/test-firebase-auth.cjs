@@ -8,6 +8,7 @@ Module._load=function(name,parent,isMain){
  if(name==='firebase-admin/app')return {getApps:()=>[],initializeApp:()=>({name:'aura-firebase-check'})};
  if(name==='firebase-admin/auth')return {getAuth:()=>({verifyIdToken:async token=>{
   if(token==='x'.repeat(120))return {email_verified:true,aura_role:'editor'};
+  if(token==='w'.repeat(120))return {email_verified:true,aura_role:'administrator'};
   if(token==='y'.repeat(120))return {email_verified:true};
   if(token==='z'.repeat(120))return {email_verified:false,aura_role:'administrator'};
   const e=new Error('Invalid token');e.code='auth/argument-error';throw e;
@@ -25,6 +26,19 @@ const ctx={error:()=>{}};
  res=await h(swappTokenOnly,ctx);assert.equal(res.status,401,'Azure platform token must NEVER authorize the Firebase route');
  res=await h(req('x'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.authorized,true);assert.equal(res.jsonBody.role,'editor');
  res=await h(req('y'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.authorized,false);
+ res=await h(req('w'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.role,'administrator');
+ assert.equal(res.jsonBody.setup.serviceCredential,'missing');
+ assert.equal(res.jsonBody.setup.storageConfigured,false);
+ process.env.AURA_FIREBASE_SERVICE_ACCOUNT_JSON='not-json';
+ res=await h(req('w'.repeat(120)),ctx);assert.equal(res.jsonBody.setup.serviceCredential,'invalid-json');
+ process.env.AURA_FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({project_id:'other-project',client_email:'fake@example.com',private_key:'-----BEGIN PRIVATE KEY-----TEST'});
+ res=await h(req('w'.repeat(120)),ctx);assert.equal(res.jsonBody.setup.serviceCredential,'project-mismatch');
+ process.env.AURA_FIREBASE_SERVICE_ACCOUNT_JSON=JSON.stringify({project_id:'aura-fiag',client_email:'fake@example.com',private_key:'-----BEGIN PRIVATE KEY-----TEST'});
+ process.env.AURA_STORAGE_CONNECTION_STRING='fake-test';
+ res=await h(req('w'.repeat(120)),ctx);assert.equal(res.jsonBody.setup.serviceCredential,'configured');
+ assert.equal(res.jsonBody.setup.storageConfigured,true);
+ delete process.env.AURA_FIREBASE_SERVICE_ACCOUNT_JSON;
+ delete process.env.AURA_STORAGE_CONNECTION_STRING;
  res=await h(req('z'.repeat(120)),ctx);assert.equal(res.status,403);
  res=await h(req('q'.repeat(120)),ctx);assert.equal(res.status,401);
  console.log('Firebase: token requerido, rol y correo verificado, rechazo seguro OK');
