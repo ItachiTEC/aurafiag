@@ -31,7 +31,7 @@
       const json=await response.json();
       const principal=json&&json.clientPrincipal;
       if(!principal) {
-        show('Todavía no has iniciado sesión. Ingresa con la cuenta GitHub que administra AURA.',{signin:true,enter:false,signout:false,help:mode==='forbidden'});
+        show('Puedes iniciar sesión con Firebase usando el botón principal. GitHub sigue disponible como acceso de emergencia.',{signin:true,enter:false,signout:false,help:mode==='forbidden'});
         return;
       }
       const name=typeof principal.userDetails==='string'?principal.userDetails:'usuario autenticado';
@@ -45,7 +45,7 @@
         show('Sesión iniciada como '+name+'. Falta el permiso administrator de Azure para acceder a publicaciones y mensajes privados.',{signin:false,enter:false,signout:true,help:true,warning:true});
       }
     }catch {
-      show('No se pudo comprobar la sesión en Azure. Puedes iniciar sesión otra vez o reintentar más tarde.',{signin:true,enter:false,signout:true,help:true,warning:true});
+      show('No se pudo comprobar la sesión de respaldo de GitHub. El acceso principal con Firebase sigue disponible.',{signin:true,enter:false,signout:true,help:true,warning:true});
     }
   })();
 })();
