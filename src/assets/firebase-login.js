@@ -57,7 +57,9 @@ function showUser(email){
  actions.hidden=false;
  byId('fb-account').textContent='Sesión de: '+email;
 }
+let activeDiagnosis=0;
 async function diagnoseUser(user,{refresh=false}={}){
+ const run=++activeDiagnosis;
  showUser(user.email||'cuenta Firebase');
  if(refresh){
   try{await reload(user);}catch(e){notice(errorInfo(e),{warning:true});return;}
@@ -72,13 +74,20 @@ async function diagnoseUser(user,{refresh=false}={}){
  recheck.hidden=true;
  notice('Inicio de sesión correcto y correo verificado. Comprobando tu rol en AURA…');
  try{
-  const token=await user.getIdToken(true);
+  // Evita bloqueos largos del refresco de token en navegadores integrados.
+  // Una nueva comprobación manual sí refresca claims recién asignados.
+  const token=await Promise.race([
+   user.getIdToken(refresh),
+   new Promise((_,reject)=>setTimeout(()=>reject(new Error('token-timeout')),12000))
+  ]);
+  if(run!==activeDiagnosis)return;
   const response=await fetch('/api/firebase-auth-check',{
    method:'GET',
    headers:{'Authorization':'Bearer '+token},
    cache:'no-store',
    signal:AbortSignal.timeout(12000)
   });
+  if(run!==activeDiagnosis)return;
   if(response.status===404){
    notice('¡Firebase inició sesión correctamente! Falta publicar o reparar la API /api/firebase-auth-check de Azure. No es un problema de contraseña.',{warning:true});
    return;
@@ -102,7 +111,8 @@ async function diagnoseUser(user,{refresh=false}={}){
    notice('¡Inicio de sesión correcto! Tu cuenta aún no tiene un rol de AURA (administrator/editor/viewer). Debe asignarlo la administración mediante un procedimiento seguro; el CMS permanece restringido.',{warning:true});
   }
  }catch(error){
-  const label=error?.name==='TimeoutError'?'La API tardó demasiado':'No se pudo consultar la API de Azure';
+  if(run!==activeDiagnosis)return;
+  const label=error?.name==='TimeoutError'||error?.message==='token-timeout'?'La verificación tardó demasiado':'No se pudo consultar la API de Azure';
   notice('¡Firebase inició sesión correctamente! '+label+'. El acceso al editor sigue pendiente, pero no necesitas restablecer tu contraseña.',{warning:true});
  }
 }
@@ -114,10 +124,19 @@ form.addEventListener('submit',async event=>{
  submit.disabled=true;
  notice('Comprobando correo y contraseña en Firebase…');
  try{
-  await signInWithEmailAndPassword(auth,email,passwordInput.value);
+  const result=await signInWithEmailAndPassword(auth,email,passwordInput.value);
   passwordInput.value='';
+  // La identidad ya se autenticó: actualiza explícitamente el estado aunque
+  // onAuthStateChanged se ejecute antes, después o solo al restaurar la sesión.
+  notice('Sesión de Firebase iniciada. Comprobando permisos de AURA…',{ok:true});
+  await diagnoseUser(result.user);
  }catch(error){
-  notice(errorInfo(error),{warning:true});
+  // Firebase puede haber autenticado correctamente aunque Azure esté caído.
+  if(auth.currentUser){
+   notice('Tu sesión de Firebase está activa. No hemos podido completar la comprobación del rol en Azure.',{warning:true});
+  }else{
+   notice(errorInfo(error),{warning:true});
+  }
  }finally{submit.disabled=false;}
 });
 reset.addEventListener('click',async()=>{
@@ -143,7 +162,7 @@ recheck.addEventListener('click',async()=>{
  if(user)await diagnoseUser(user,{refresh:true});
 });
 logout.addEventListener('click',async()=>{
- try{await signOut(auth);showForm();notice('Sesión cerrada. Ahora puedes acceder con otra cuenta.');}
+ try{activeDiagnosis++;await signOut(auth);showForm();notice('Sesión cerrada. Ahora puedes acceder con otra cuenta.');}
  catch(error){notice(errorInfo(error),{warning:true});}
 });
 onAuthStateChanged(auth,user=>{
