@@ -7,6 +7,19 @@
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/auth.css">
 <script type="module" src="/assets/firebase-login.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  window.setTimeout(() => {
+    if (!window.__auraFirebaseModuleReady) {
+      const status = document.getElementById('fb-status');
+      if(status) {
+        status.textContent = 'No se pudo cargar Firebase en este navegador. Abre la página de prueba en Chrome o Safari, verifica la conexión y desactiva bloqueadores de scripts si es necesario.';
+        status.classList.add('auth-status-warning');
+      }
+    }
+  }, 12000);
+});
+</script>
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -19,7 +32,7 @@
  <section class="auth-card" aria-labelledby="firebase-title">
  <span class="auth-card-counter">AURA / FIREBASE AUTHENTICATION</span>
  <h2 id="firebase-title">INGRESAR<br>AL EQUIPO.</h2>
- <p>Utiliza el correo registrado por la administración. No hay registro público de usuarios.</p>
+ <p>Usa una cuenta creada en <strong>Firebase Authentication → Users</strong>. No es suficiente utilizar la cuenta Google con la que creaste el proyecto.</p>
  <form id="firebase-login-form" class="fb-login-form">
   <label for="fb-email">Correo electrónico</label>
   <input id="fb-email" name="email" type="email" autocomplete="username" required maxlength="254" placeholder="encargado@ejemplo.com">
@@ -28,17 +41,19 @@
   <button id="fb-login-submit" class="auth-button auth-button-primary" type="submit">Ingresar con Firebase <span aria-hidden="true">↗</span></button>
  </form>
  <div id="fb-status" class="auth-status" role="status" aria-live="polite">Preparando conexión segura…</div>
+ <p id="fb-account" class="fb-account"></p>
  <div id="fb-actions" class="auth-actions" hidden>
   <button type="button" class="auth-button auth-button-secondary" id="fb-verify-email">Enviar verificación de correo ↗</button>
+  <button type="button" class="auth-button auth-button-secondary" id="fb-recheck-email">Ya verifiqué mi correo: comprobar ↗</button>
   <button type="button" class="auth-button auth-button-secondary" id="fb-logout">Cerrar sesión ↗</button>
  </div>
  <button type="button" class="fb-reset-link" id="fb-reset">¿Olvidaste tu contraseña? Recupérala por correo ↗</button>
- <div class="auth-help"><h3>Acceso en preparación</h3><p>Iniciar sesión comprueba tu identidad. Los permisos editor/administrador deberán asignarse desde un servicio seguro y verificarse en Azure antes de habilitar la gestión de contenidos.</p><a href="/login/">Entrar al panel actual con GitHub ↗</a></div>
+ <div class="auth-help"><h3>Acceso en preparación</h3><p>Esta página permite comprobar tu correo y contraseña. Aún no abre directamente el CMS: los permisos de editor y administrador deberán asignarse y validarse en Azure.</p><a href="/login/">Entrar al panel actual con GitHub ↗</a></div>
  </section>
 </main>
 <footer class="auth-footer"><span>AURA / FIAG · Acceso en pruebas</span><a href="/privacidad/">Privacidad</a></footer>
 <style>
-.fb-login-form{display:flex;flex-direction:column;gap:9px;margin-top:22px}
+.fb-account{font-size:.78rem;font-weight:750;color:#355f62;overflow-wrap:anywhere}.fb-login-form{display:flex;flex-direction:column;gap:9px;margin-top:22px}
 .fb-login-form label{font-size:.82rem;font-weight:900;color:#183e46}
 .fb-login-form input{width:100%;padding:13px;border:1px solid #9aaeb0;border-radius:8px;color:#153a43;background:#fff;font:inherit;margin-bottom:10px}
 .fb-login-form input:focus-visible,.fb-reset-link:focus-visible{outline:3px solid #167b7d;outline-offset:2px}
