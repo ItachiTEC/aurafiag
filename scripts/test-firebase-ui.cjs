@@ -6,7 +6,7 @@ const read=path=>readFileSync(resolve(__dirname,'..',path),'utf8');
 const html=read('src/firebase-login/index.html');
 const js=read('src/assets/firebase-login.js');
 const config=read('src/assets/firebase-config.js');
-for(const required of ['fb-email','fb-password','fb-login-form','fb-status','fb-verify-email','fb-recheck-email','fb-logout','fb-account']) {
+for(const required of ['fb-email','fb-password','firebase-login-form','fb-status','fb-verify-email','fb-recheck-email','fb-logout','fb-account']) {
  assert(html.includes('id="'+required+'"'), 'Missing Firebase login field: '+required);
 }
 assert(html.includes('/assets/firebase-login.js'),'Firebase login module missing');
