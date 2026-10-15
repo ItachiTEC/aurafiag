@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#102c36">
+  <meta name="description" content="Acceso seguro al panel de administración de AURA.">
+  <title>Acceso del equipo | AURA</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/auth.css">
+  <script src="/assets/auth.js" defer></script>
+</head>
+<body data-auth-mode="login">
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <header class="auth-header">
+    <a class="auth-brand" href="/" aria-label="Volver al inicio AURA">AURA<span>.</span><small>FIAG / UNJBG</small></a>
+    <a class="auth-home" href="/">← Volver al sitio</a>
+  </header>
+  <main id="main" class="auth-layout">
+    <div class="auth-story">
+      <span class="auth-kicker"><span class="auth-dot"></span> ÁREA DEL EQUIPO · AURA</span>
+      <h1>GESTIONA<br><em>LO QUE</em><br>COMUNICAMOS<span class="auth-star">✳</span></h1>
+      <p>Noticias, propuestas, recursos, equipo y mensajes en un solo lugar. Un acceso diseñado para quienes tienen permiso de administrar AURA.</p>
+      <span class="auth-side-caption">UNA SOLA CUENTA · UN ACCESO SEGURO</span>
+    </div>
+    <section class="auth-card" aria-labelledby="auth-card-title">
+      <span class="auth-card-counter">01 / PANEL PRIVADO</span>
+      <div class="auth-card-logo" aria-hidden="true">↗</div>
+      <h2 id="auth-card-title">ACCESO<br>AL PANEL.</h2>
+      <p>Entra con tu cuenta de GitHub autorizada. No necesitas crear otra contraseña ni compartirla con nadie.</p>
+      <div class="auth-status" id="auth-status" role="status" aria-live="polite">Comprobando tu sesión…</div>
+      <div class="auth-actions">
+        <a class="auth-button auth-button-primary" id="auth-signin" href="/.auth/login/github?post_login_redirect_uri=/login/" hidden>Iniciar sesión con GitHub <span aria-hidden="true">↗</span></a>
+        <a class="auth-button auth-button-primary" id="auth-enter" href="/admin/" hidden>Ir al administrador <span aria-hidden="true">↗</span></a>
+        <a class="auth-button auth-button-secondary" id="auth-signout" href="/.auth/logout?post_logout_redirect_uri=/login/" hidden>Salir y cambiar de cuenta <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="auth-help" id="auth-help" hidden>
+        <h3>¿Qué hacer si todavía no tienes acceso?</h3>
+        <ol>
+          <li>En Azure abre tu recurso <b>Static Web Apps</b> de AURA.</li>
+          <li>Ve a <b>Settings → Role management → Invite</b>.</li>
+          <li>Selecciona <b>GitHub</b>, coloca tu usuario y asigna exactamente <code>administrator</code>.</li>
+          <li>Abre el enlace de invitación, acéptalo y vuelve a iniciar sesión aquí.</li>
+        </ol>
+        <a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer">Abrir Azure Portal ↗</a>
+      </div>
+    </section>
+  </main>
+  <footer class="auth-footer"><span>© AURA / FIAG · Acceso para el equipo autorizado</span><a href="/privacidad/">Privacidad</a></footer>
+</body>
+</html>
