@@ -107,7 +107,7 @@ export async function mountCmsAdmin(root){
  function select(type){active=type;displayTabs();if(type!=='inbox')showList();}
  function showList(){
   body.replaceChildren();
-  if(!connected){const alert=el('div','cms-empty');alert.append(el('strong',null,'El editor todavía no está disponible.'),el('p',null,connectionIssue||'Se requiere conexión a la API de contenidos. La bandeja de Mensajes se mantiene aparte.'));const a=el('a','cms-secondary','Ver diagnóstico de API ↗');a.href='/api/cms-health';a.target='_blank';a.rel='noopener noreferrer';alert.append(a,document.createTextNode(' '),button('Reintentar conexión','cms-secondary',connect));body.append(alert);return;}
+  if(!connected){const alert=el('div','cms-empty');alert.append(el('strong',null,'El editor todavía no está disponible.'),el('p',null,connectionIssue||'Se requiere conexión a la API de contenidos. La bandeja de Mensajes se mantiene aparte.'));const a=el('a','cms-secondary','Ver diagnóstico de API ↗');a.href='/api/cms-health';a.target='_blank';a.rel='noopener noreferrer';const authLink=el('a','cms-secondary','Comprobar permiso de Azure ↗');authLink.href='/api/admin/cms-auth-check';authLink.target='_blank';authLink.rel='noopener noreferrer';alert.append(a,document.createTextNode(' '),authLink,document.createTextNode(' '),button('Reintentar conexión','cms-secondary',connect));body.append(alert);return;}
   if(active==='identity'){edit('site');return;}
   const actions=el('div','cms-bar');const heading=el('div');
   heading.append(el('h3',null,NAMES[active]),el('p',null,'Selecciona un registro o crea uno nuevo.'));

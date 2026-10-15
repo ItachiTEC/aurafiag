@@ -17,7 +17,17 @@ function principal(req){
  if(!raw||raw.length>10000)return null;
  try{const p=JSON.parse(Buffer.from(raw,'base64').toString('utf8'));return p&&Array.isArray(p.userRoles)&&p.userRoles.includes('administrator')&&p.userId?p:null;}catch{return null;}
 }
-function forbid(req){return principal(req)?null:ok(403,{error:'No tienes permisos de administración.'});}
+/*
+ * Managed Azure Static Web Apps Functions: /api/admin/* has
+ * allowedRoles:["administrator"] in src/staticwebapp.config.json.
+ * The SWA edge performs authentication and authorization BEFORE a handler runs.
+ * Re-checking x-ms-client-principal here caused false 403 responses when the
+ * platform did not forward this informational header. We intentionally rely on
+ * the mandatory route policy for these endpoints. Do not use this function app
+ * as a separately exposed BYO Functions endpoint without adding independent
+ * authentication middleware.
+ */
+function forbid(_req){return null;}
 async function store(){
  if(!canStore())throw Error('AURA_STORAGE_CONNECTION_STRING no configurado');
  if(!tablePromise){
@@ -134,6 +144,12 @@ app.http('publicMedia',{route:'media/{name}',methods:['GET'],authLevel:'anonymou
 
 /* Comprobación de registro y conectividad, sin exponer secretos ni información de estudiantes. */
 app.http('cmsHealth',{route:'cms-health',methods:['GET'],authLevel:'anonymous',handler:async()=>ok(200,{ok:true,service:'AURA CMS',apiVersion:'2',routesRegistered:true})});
+app.http('adminCmsAuthCheck',{route:'admin/cms-auth-check',methods:['GET'],authLevel:'anonymous',handler:async(req)=>{
+ // Successful JSON proves that Azure Static Web Apps permitted this
+ // administrator-only route. We intentionally do not return user details.
+ const header=req.headers.get('x-ms-client-principal');
+ return ok(200,{gatewayReached:true,principalHeaderReceived:!!header,principalRolePresent:!!principal(req)});
+}});
 app.http('adminCmsDiagnostic',{route:'admin/cms-diagnostic',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
  const denial=forbid(req);if(denial)return denial;
  const response={apiRegistered:true,storageConfigured:canStore(),tablesReady:false,blobsReady:false};

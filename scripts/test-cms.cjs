@@ -20,12 +20,26 @@ class FakeBlob{
  getContainerClient(){return new FakeContainer();}
 }
 Module._load=function(name,parent,isMain){
- if(name==='@azure/functions')return {app:{http:(n,options)=>{registrations[n]=options.handler;}}};
+ if(name==='@azure/functions')return {app:{http:(n,options)=>{
+  // Simulates the managed Static Web Apps edge role check, performed before
+  // Azure Functions runs. The handler alone is not an authentication boundary.
+  registrations[n]=async(req,ctx)=>{
+   if(options.route.startsWith('admin/')){
+    const header=req.headers.get('x-ms-client-principal');
+    let roles=[];
+    try{roles=JSON.parse(Buffer.from(header||'','base64').toString('utf8')).userRoles||[];}catch{}
+    if(!roles.includes('administrator'))return {status:403,jsonBody:{error:'SWA edge access denied'}};
+   }
+   return options.handler(req,ctx);
+  };
+ }} };
  if(name==='@azure/data-tables')return {TableClient:FakeTable};
  if(name==='@azure/storage-blob')return {BlobServiceClient:FakeBlob};
  return original.apply(this,arguments);
 };
 process.env.AURA_STORAGE_CONNECTION_STRING='fake-azure-storage';
+const config=JSON.parse(require('node:fs').readFileSync(require('node:path').resolve(__dirname,'../src/staticwebapp.config.json'),'utf8'));
+assert(config.routes.some(x=>x.route==='/api/admin/*'&&x.allowedRoles.length===1&&x.allowedRoles[0]==='administrator'),'All admin endpoints must be protected by SWA platform');
 require('../api/src/functions/cms.js');
 const administrator={userId:'editor1',userRoles:['authenticated','administrator']};
 const request=(method='GET',body=null,admin=false,params={})=>({
@@ -57,6 +71,11 @@ const context={error:()=>{}};
  const deleted=await registrations.adminContentDelete(request('DELETE',null,true,{type:'proposals',id:'prueba'}),context);assert.equal(deleted.status,200);
  publicResult=await registrations.publicContent(request(),context);
  assert(publicResult.jsonBody.items.some(x=>x.id==='prueba'&&x.deleted===true));
+ const gatewayDenied=await registrations.adminCmsAuthCheck(request('GET',null,false),context);
+ assert.equal(gatewayDenied.status,403,'SWA blocks unauthenticated diagnostics');
+ const gatewayAllowed=await registrations.adminCmsAuthCheck(request('GET',null,true),context);
+ assert.equal(gatewayAllowed.status,200);
+ assert.equal(gatewayAllowed.jsonBody.gatewayReached,true);
  const fakeJpg=Buffer.from([255,216,255,224,...Array.from({length:70},()=>1)]);
  const upload=await registrations.adminMediaUpload(request('POST',{base64:fakeJpg.toString('base64')},true),context);
  assert.equal(upload.status,201);
