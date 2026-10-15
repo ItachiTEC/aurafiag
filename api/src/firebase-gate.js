@@ -5,9 +5,23 @@ let firebaseApp;
 const response=(status,error)=>({status,jsonBody:{error},headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 function client(){
  // Importación diferida: los tests y las rutas públicas no necesitan Admin SDK.
- const {getApps,initializeApp}=require('firebase-admin/app');
+ const {getApps,initializeApp,cert}=require('firebase-admin/app');
  const {getAuth}=require('firebase-admin/auth');
- firebaseApp=firebaseApp||getApps().find(a=>a.name==='aura-private-cms')||initializeApp({projectId:'aura-fiag'},'aura-private-cms');
+ if(!firebaseApp){
+  firebaseApp=getApps().find(a=>a.name==='aura-private-cms');
+  if(!firebaseApp){
+   // Preferir una identidad gestionada, si se ha configurado ADC.
+   // En Azure SWA se puede configurar un secreto privado en Application settings.
+   const options={projectId:'aura-fiag'};
+   const secret=process.env.AURA_FIREBASE_SERVICE_ACCOUNT_JSON;
+   if(secret){
+    const credentials=JSON.parse(secret);
+    if(credentials.project_id!=='aura-fiag')throw Error('Firebase credential project mismatch');
+    options.credential=cert(credentials);
+   }
+   firebaseApp=initializeApp(options,'aura-private-cms');
+  }
+ }
  return getAuth(firebaseApp);
 }
 async function requireFirebaseAdmin(request,context){
