@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#102c36">
+<title>Panel Firebase · AURA FIAG</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/styles.css">
+<script type="module" src="/assets/firebase-dashboard.js"></script>
+<style>
+.firebase-admin-shell{min-height:100vh;background:#faf9f3;color:#102f38}
+.firebase-admin-header{background:#12343d;color:#fff;padding:23px max(24px,calc((100vw - 1190px)/2));display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.firebase-admin-header a{color:#e0f5d3;text-decoration:none}.firebase-admin-header strong{font-size:1.7rem;letter-spacing:-.05em}
+.firebase-admin-header button{border:1px solid #a7c1bb;border-radius:30px;padding:11px 20px;color:#fff;background:transparent;cursor:pointer}
+.firebase-admin-inner{max-width:1190px;margin:0 auto;padding:42px 24px 80px}
+.firebase-admin-state{padding:26px;border:1px solid #9fb8a8;background:#eef3eb;border-radius:12px;max-width:800px}
+.firebase-admin-inner .cms-dashboard{min-height:400px}
+</style>
+</head>
+<body>
+<div class="firebase-admin-shell">
+ <header class="firebase-admin-header">
+  <div><a href="/" aria-label="Volver a AURA"><strong>AURA.</strong> <span>FIAG / ADMINISTRACIÓN</span></a></div>
+  <div><span id="fb-admin-user"></span> <button type="button" id="fb-admin-logout">Cerrar sesión</button></div>
+ </header>
+ <main class="firebase-admin-inner">
+  <p style="font-weight:800;letter-spacing:.12em;text-transform:uppercase">Firebase · Equipo autorizado</p>
+  <section id="fb-admin-state" class="firebase-admin-state" role="status" aria-live="polite">Comprobando sesión y permisos…</section>
+  <div id="fb-admin-root"></div>
+ </main>
+</div>
+</body>
+</html>
