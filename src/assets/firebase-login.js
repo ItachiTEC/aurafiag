@@ -16,6 +16,7 @@ const passwordInput=byId('fb-password');
 const submit=byId('fb-login-submit');
 const status=byId('fb-status');
 const actions=byId('fb-actions');
+const openPanel=byId('fb-open-panel');
 const verify=byId('fb-verify-email');
 const recheck=byId('fb-recheck-email');
 const logout=byId('fb-logout');
@@ -49,10 +50,12 @@ function errorInfo(error){
  return description+(code?' (Código: '+code+')':'');
 }
 function showForm(){
+ if(openPanel)openPanel.hidden=true;
  form.hidden=false;
  actions.hidden=true;
 }
 function showUser(email){
+ if(openPanel)openPanel.hidden=true;
  form.hidden=true;
  actions.hidden=false;
  byId('fb-account').textContent='Sesión de: '+email;
@@ -116,7 +119,8 @@ async function diagnoseUser(user,{refresh=false}={}){
   }
   const result=await response.json();
   if(result.authorized){
-   notice('¡Cuenta verificada! Rol AURA: '+result.role+'. Esta versión es una prueba de acceso; el panel privado todavía necesita completar su integración.',{ok:true});
+   if(openPanel&&result.role==='administrator')openPanel.hidden=false;
+   notice('¡Cuenta verificada! Rol AURA: '+result.role+'. Puedes abrir el panel privado de prueba. Los permisos de escritura también se validan en el servidor.',{ok:true});
   }else{
    notice('¡Inicio de sesión correcto! Tu cuenta aún no tiene un rol de AURA (administrator/editor/viewer). Debe asignarlo la administración mediante un procedimiento seguro; el CMS permanece restringido.',{warning:true});
   }
