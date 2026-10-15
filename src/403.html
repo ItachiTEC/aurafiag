@@ -1,1 +1,49 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acceso restringido · AURA</title><style>body{font-family:system-ui;background:#09232d;color:#f8f8f3;min-height:100vh;display:grid;place-items:center;text-align:center}a{color:#b8f8c6}</style></head><body><main><h1>Acceso restringido</h1><p>Esta área es únicamente para el equipo autorizado de AURA.</p><a href="/">Volver al inicio</a></main></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#102c36">
+  <title>Acceso restringido · AURA</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/auth.css">
+  <script src="/assets/auth.js" defer></script>
+</head>
+<body data-auth-mode="forbidden">
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <header class="auth-header"><a class="auth-brand" href="/" aria-label="Inicio AURA">AURA<span>.</span><small>FIAG / UNJBG</small></a><a class="auth-home" href="/">← Volver al inicio</a></header>
+  <main class="auth-layout" id="main">
+    <div class="auth-story">
+      <span class="auth-kicker"><span class="auth-dot"></span> ACCESO / SEGURIDAD</span>
+      <h1>FALTA<br>UN <em>PERMISO</em><span class="auth-star">✳</span></h1>
+      <p>El administrador está protegido para cuidar las publicaciones y los mensajes de los estudiantes. La cuenta correcta debe tener permiso explícito de Azure.</p>
+      <span class="auth-side-caption">SEGURIDAD PARA TODA LA COMUNIDAD FIAG</span>
+    </div>
+    <section class="auth-card" aria-labelledby="auth-card-title">
+      <span class="auth-card-counter">ERROR 403 / PERMISOS</span>
+      <div class="auth-card-logo" aria-hidden="true">!</div>
+      <h2 id="auth-card-title">REVISAR<br>ACCESO.</h2>
+      <p>Iniciar sesión con GitHub no equivale a ser administrador. Comprueba la cuenta y el rol <code>administrator</code>.</p>
+      <div class="auth-status" id="auth-status" role="status" aria-live="polite">Comprobando tu sesión…</div>
+      <div class="auth-actions">
+        <a class="auth-button auth-button-primary" id="auth-signin" href="/.auth/login/github?post_login_redirect_uri=/login/" hidden>Iniciar sesión con GitHub <span aria-hidden="true">↗</span></a>
+        <a class="auth-button auth-button-primary" id="auth-enter" href="/admin/" hidden>Volver a intentar <span aria-hidden="true">↗</span></a>
+        <a class="auth-button auth-button-secondary" id="auth-signout" href="/.auth/logout?post_logout_redirect_uri=/login/" hidden>Salir y cambiar de cuenta <span aria-hidden="true">↗</span></a>
+        <a class="auth-button auth-button-secondary" href="/login/">Abrir centro de acceso <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="auth-help" id="auth-help" hidden>
+        <h3>Para habilitar tu usuario</h3>
+        <ol>
+          <li>En Azure Portal entra a tu recurso <b>Static Web Apps</b>.</li>
+          <li>Ve a <b>Settings → Role management → Invite</b>.</li>
+          <li>Proveedor <b>GitHub</b>, tu usuario de GitHub y rol exacto <code>administrator</code>.</li>
+          <li>Acepta el enlace de invitación con esa cuenta, cierra sesión aquí y vuelve a entrar.</li>
+        </ol>
+        <a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer">Abrir Azure Portal ↗</a>
+      </div>
+    </section>
+  </main>
+  <footer class="auth-footer"><span>© AURA / FIAG · Acceso del equipo autorizado</span><a href="/privacidad/">Privacidad</a></footer>
+</body>
+</html>
