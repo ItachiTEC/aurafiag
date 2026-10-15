@@ -28,6 +28,23 @@ function principal(req){
  * authentication middleware.
  */
 function forbid(_req){return null;}
+const {requireFirebaseAdmin}=require('../firebase-gate.js');
+// Las rutas SWA /api/admin/* mantienen su propio control Azure.
+// Estas rutas paralelas son públicas a nivel de gateway, pero cada solicitud
+// se autoriza en el servidor antes de usar Table/Blob Storage.
+function registerFirebaseTwin(name,options){
+ app.http(name,options);
+ app.http('firebase'+name.charAt(0).toUpperCase()+name.slice(1),{
+  ...options,
+  route:options.route.replace(/^admin\//,'firebase-admin/'),
+  handler:async(req,context)=>{
+   const denial=await requireFirebaseAdmin(req,context);
+   if(denial)return denial;
+   return options.handler(req,context);
+  }
+ });
+}
+
 async function store(){
  if(!canStore())throw Error('AURA_STORAGE_CONNECTION_STRING no configurado');
  if(!tablePromise){
@@ -94,7 +111,7 @@ app.http('publicContent',{route:'content',methods:['GET'],authLevel:'anonymous',
  if(!canStore())return ok(200,{ready:false,items:[]});
  try{return ok(200,{ready:true,items:await records(false)});}catch(e){serverError(context,e);return ok(503,{error:'No se pudo recuperar contenido.'});}
 }});
-app.http('adminContent',{route:'admin/content',methods:['GET','POST'],authLevel:'anonymous',handler:async(req,context)=>{
+registerFirebaseTwin('adminContent',{route:'admin/content',methods:['GET','POST'],authLevel:'anonymous',handler:async(req,context)=>{
  const denial=forbid(req);if(denial)return denial;
  if(req.method==='GET'){try{return ok(200,{items:await records(true)});}catch(e){serverError(context,e);return ok(503,{error:'No se pudo abrir el editor.'});}}
  let input;try{const size=Number(req.headers.get('content-length')||0);if(size>20000)return ok(413,{error:'Contenido demasiado grande.'});input=await req.json();if(JSON.stringify(input).length>20000)return ok(413,{error:'Contenido demasiado grande.'});}catch{return ok(400,{error:'JSON inválido.'});}
@@ -104,7 +121,7 @@ app.http('adminContent',{route:'admin/content',methods:['GET','POST'],authLevel:
  const now=new Date().toISOString();
  try{const table=await store();await table.upsertEntity({partitionKey:type,rowKey:id,state,deleted:false,updatedAt:now,payload:JSON.stringify(valid)},'Replace');return ok(200,{ok:true,id,updatedAt:now});}catch(e){serverError(context,e);return ok(503,{error:'No fue posible guardar el contenido.'});}
 }});
-app.http('adminContentDelete',{route:'admin/content/{type}/{id}',methods:['DELETE'],authLevel:'anonymous',handler:async(req,context)=>{
+registerFirebaseTwin('adminContentDelete',{route:'admin/content/{type}/{id}',methods:['DELETE'],authLevel:'anonymous',handler:async(req,context)=>{
  const denial=forbid(req);if(denial)return denial;
  const {type,id}=req.params;
  if(!TYPES.has(type)||!ID.test(id)||type==='identity')return ok(400,{error:'Tipo no válido.'});
@@ -116,7 +133,7 @@ function imageType(data){
  if(data.length>=4&&data[0]===255&&data[1]===216&&data[2]===255)return {mime:'image/jpeg',ext:'jpg'};
  return null;
 }
-app.http('adminMediaUpload',{route:'admin/media',methods:['POST'],authLevel:'anonymous',handler:async(req,context)=>{
+registerFirebaseTwin('adminMediaUpload',{route:'admin/media',methods:['POST'],authLevel:'anonymous',handler:async(req,context)=>{
  const denial=forbid(req);if(denial)return denial;
  let payload;try{
   if(Number(req.headers.get('content-length')||0)>3_000_000)return ok(413,{error:'Máximo 2 MB por imagen.'});
@@ -150,7 +167,7 @@ app.http('adminCmsAuthCheck',{route:'admin/cms-auth-check',methods:['GET'],authL
  const header=req.headers.get('x-ms-client-principal');
  return ok(200,{gatewayReached:true,principalHeaderReceived:!!header,principalRolePresent:!!principal(req)});
 }});
-app.http('adminCmsDiagnostic',{route:'admin/cms-diagnostic',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
+registerFirebaseTwin('adminCmsDiagnostic',{route:'admin/cms-diagnostic',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
  const denial=forbid(req);if(denial)return denial;
  const response={apiRegistered:true,storageConfigured:canStore(),tablesReady:false,blobsReady:false};
  if(!canStore())return ok(200,response);

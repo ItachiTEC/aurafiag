@@ -11,6 +11,8 @@ assert.equal(config.responseOverrides['401'].redirect,'/login/');
 assert.equal(config.responseOverrides['403'].rewrite,'/403.html');
 assert(!config.routes.some(x=>x.route==='/admin*'&&x.allowedRoles?.includes('authenticated')),'Logging in must NOT grant CMS access');
 const login=file('src/login/index.html');
+assert(login.includes('id="firebase-primary-login"')&&login.includes('href="/firebase-login/"'),'Firebase is primary staff login');
+assert(login.includes('Acceso de emergencia con GitHub'),'Preserve GitHub recovery route');
 const forbidden=file('src/403.html');
 const auth=file('src/assets/auth.js');
 for(const html of [login,forbidden]){

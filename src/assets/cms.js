@@ -41,6 +41,7 @@ const OPTIONS={
  status:[['consulta','En consulta'],['formulacion','En formulación'],['presentada','Presentada'],['seguimiento','En seguimiento'],['finalizada','Finalizada']]
 };
 const NAMES={news:'Entradas',proposals:'Propuestas',team:'Equipo',resources:'Recursos',identity:'Identidad',inbox:'Mensajes'};
+let firebaseTokenProvider=null; // set only for /firebase-admin/; legacy GitHub admin remains unchanged
 const el=(tag,classname,textValue)=>{
  const n=document.createElement(tag);
  if(classname)n.className=classname;
@@ -51,7 +52,14 @@ const button=(label,classname,fn)=>{
  const n=el('button',classname,label);n.type='button';n.addEventListener('click',fn);return n;
 };
 async function call(url,config){
- const response=await fetch(url,Object.assign({cache:'no-store',credentials:'same-origin'},config||{}));
+ let target=url;
+ const options=Object.assign({cache:'no-store',credentials:'same-origin'},config||{});
+ if(firebaseTokenProvider&&url.startsWith('/api/admin/')){
+  target=url.replace('/api/admin/','/api/firebase-admin/');
+  const token=await firebaseTokenProvider();
+  options.headers={...(config?.headers||{}),'X-AURA-Firebase-Token':token};
+ }
+ const response=await fetch(target,options);
  let data={};try{data=await response.json();}catch{}
  if(!response.ok){const e=Error(data.error||'Error '+response.status);e.status=response.status;throw e;}
  return data;
@@ -83,7 +91,8 @@ function applyAdminModel(source){
  }
  return all;
 }
-export async function mountCmsAdmin(root){
+export async function mountCmsAdmin(root,{firebaseToken=null}={}){
+ firebaseTokenProvider=firebaseToken;
  if(!root||root.dataset.cmsMounted)return;
  root.dataset.cmsMounted='true';
  const inbox=el('section','cms-inbox');
@@ -104,7 +113,51 @@ export async function mountCmsAdmin(root){
   [...tabs.children].forEach(n=>{n.classList.toggle('selected',n.dataset.type===active);n.setAttribute('aria-current',n.dataset.type===active?'page':'false');});
   inbox.hidden=active!=='inbox';body.hidden=active==='inbox';
  }
- function select(type){active=type;displayTabs();if(type!=='inbox')showList();}
+ function select(type){
+  active=type;displayTabs();
+  if(type==='inbox'){if(firebaseTokenProvider)loadFirebaseInbox();return;}
+  showList();
+ }
+ async function loadFirebaseInbox(){
+  inbox.replaceChildren();
+  const title=el('h3',null,'Mensajes privados del equipo');
+  const info=el('p','cms-feedback','Cargando mensajes…');
+  const list=el('div','admin-list');
+  inbox.append(title,info,list);
+  try{
+   const data=await call('/api/admin/messages');
+   const records=(data.items||[]).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+   info.textContent=records.length+' mensajes recibidos. Solo administradores autorizados pueden leerlos.';
+   if(!records.length)list.append(el('p',null,'Sin mensajes por ahora.'));
+   for(const message of records){
+    const card=el('article','admin-item');
+    const heading=el('h3',null,message.subject||'Sin asunto');
+    const meta=el('p','admin-person',[(message.school||''),(message.senderName||''),(message.email||''),(message.createdAt||'')].filter(Boolean).join(' · '));
+    const body=el('p','admin-message',message.message||'');
+    const status=el('select');status.setAttribute('aria-label','Estado del mensaje');
+    for(const [value,label] of [['nuevo','Nuevo'],['revision','En revisión'],['respondido','Respondido'],['cerrado','Cerrado']]){
+     const option=el('option',null,label);option.value=value;if(message.status===value)option.selected=true;status.append(option);
+    }
+    const note=el('input');note.type='text';note.placeholder='Nota interna';note.maxLength=300;note.value=message.note||'';
+    note.setAttribute('aria-label','Nota interna');
+    const result=el('p','admin-feedback');
+    const save=button('Guardar estado','cms-primary',async()=>{
+     save.disabled=true;result.textContent='Guardando…';
+     try{await call('/api/admin/messages/'+encodeURIComponent(message.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status.value,note:note.value})});result.textContent='Mensaje actualizado.';}
+     catch(e){result.textContent='Error: '+e.message;}
+     finally{save.disabled=false;}
+    });
+    const remove=button('Eliminar','cms-danger',async()=>{
+     if(!confirm('¿Eliminar definitivamente este mensaje?'))return;
+     remove.disabled=true;
+     try{await call('/api/admin/messages/'+encodeURIComponent(message.id),{method:'DELETE'});card.remove();result.textContent='Mensaje eliminado.';}
+     catch(e){result.textContent='Error: '+e.message;remove.disabled=false;}
+    });
+    card.append(heading,meta,body,status,note,save,remove,result);
+    list.append(card);
+   }
+  }catch(e){info.textContent='No se pudo abrir la bandeja: '+e.message;}
+ }
  function showList(){
   body.replaceChildren();
   if(!connected){const alert=el('div','cms-empty');alert.append(el('strong',null,'El editor todavía no está disponible.'),el('p',null,connectionIssue||'Se requiere conexión a la API de contenidos. La bandeja de Mensajes se mantiene aparte.'));const a=el('a','cms-secondary','Ver diagnóstico de API ↗');a.href='/api/cms-health';a.target='_blank';a.rel='noopener noreferrer';const authLink=el('a','cms-secondary','Comprobar permiso de Azure ↗');authLink.href='/api/admin/cms-auth-check';authLink.target='_blank';authLink.rel='noopener noreferrer';alert.append(a,document.createTextNode(' '),authLink,document.createTextNode(' '),button('Reintentar conexión','cms-secondary',connect));body.append(alert);return;}
@@ -220,8 +273,11 @@ export async function mountCmsAdmin(root){
    select('news');
   }catch(e){
    connected=false;
-   if(e.status===404)connectionIssue='Error 404: Azure no encontró la ruta /api/admin/content. No es un fallo de contraseña ni significa que Storage esté desconectado. Puede tratarse de funciones no registradas o de despliegue de API pendiente.';
-   else if(e.status===503)connectionIssue='Error 503: la ruta existe, pero Azure no pudo abrir Table Storage. Revisa AURA_STORAGE_CONNECTION_STRING y que tu cuenta permita tablas.';
+   if(e.status===404)connectionIssue='Error 404: Azure no encontró la ruta '+(firebaseTokenProvider?'/api/firebase-admin/content':'/api/admin/content')+'. No es un fallo de contraseña ni significa que Storage esté desconectado. Puede tratarse de funciones no registradas o de despliegue de API pendiente.';
+   else if(e.status===503){
+    if(/autorización administrativa/i.test(e.message))connectionIssue='Error 503: Firebase Admin SDK todavía no puede comprobar sesiones con revocación. Revisa AURA_FIREBASE_SERVICE_ACCOUNT_JSON en las variables de entorno del despliegue de prueba de Azure. El servidor se detuvo antes de consultar Table Storage.';
+    else connectionIssue='Error 503: Azure no pudo abrir el almacenamiento de contenidos. Revisa AURA_STORAGE_CONNECTION_STRING, la disponibilidad de Azure Tables y los registros del servidor.';
+   }
    else if(e.status===401||e.status===403)connectionIssue='Acceso restringido al servicio de contenidos. Comprueba que la cuenta tiene el rol administrator y vuelve a iniciar sesión.';
    else connectionIssue='Error de comunicación ('+(e.status||'red')+'). Comprueba las funciones de Azure y reintenta.';
    say('No se pudo abrir el editor: '+e.message,true);

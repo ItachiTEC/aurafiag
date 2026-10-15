@@ -9,6 +9,25 @@ const SCHOOLS = new Set(['arquitectura','civil','geologica','artes','otra','pref
 const STATES = new Set(['nuevo','revision','respondido','cerrado']);
 const reply=(status,object)=>({status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},jsonBody:object});
 const ready=()=>Boolean(process.env.AURA_STORAGE_CONNECTION_STRING);
+const {requireFirebaseAdmin}=require('../firebase-gate.js');
+const firebaseAuthorizedRequests=new WeakSet();
+function registerFirebaseTwin(name,options){
+ app.http(name,options);
+ app.http('firebase'+name.charAt(0).toUpperCase()+name.slice(1),{
+  ...options,
+  route:options.route.replace(/^admin\//,'firebase-admin/'),
+  handler:async(req,context)=>{
+   const denial=await requireFirebaseAdmin(req,context);
+   if(denial)return denial;
+   // Este marcador solo puede crearlo el servidor DESPUÉS de validar Firebase.
+   // Nunca se acepta un encabezado del navegador como sustituto del permiso.
+   firebaseAuthorizedRequests.add(req);
+   try{return await options.handler(req,context);}
+   finally{firebaseAuthorizedRequests.delete(req);}
+  }
+ });
+}
+
 
 function getStore(){
  if(!ready()) throw new Error('La cuenta de almacenamiento no está configurada.');
@@ -33,6 +52,7 @@ function validate(input){
  return null;
 }
 function isAdmin(req){
+ if(firebaseAuthorizedRequests.has(req))return true;
  const raw=req.headers.get('x-ms-client-principal');
  if(!raw||raw.length>10000)return false;
  try{
@@ -56,7 +76,7 @@ app.http('messages',{route:'messages',methods:['POST'],authLevel:'anonymous',han
  const entity={partitionKey:'feedback',rowKey:id,createdAt:new Date().toISOString(),type:clean(body.type,30),school:clean(body.school,45),subject:clean(body.subject,110),message:clean(body.message,3000),senderName:clean(body.senderName,80),email:clean(body.email,120),proposal:clean(body.proposal,100),status:'nuevo',note:''};
  try{const table=await getStore();await table.createEntity(entity);return reply(201,{reference:id});}catch(e){logError(context,e);return reply(503,{error:'El buzón no pudo guardar el mensaje. Inténtalo después.'});}
 }});
-app.http('adminMessages',{route:'admin/messages',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
+registerFirebaseTwin('adminMessages',{route:'admin/messages',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
  if(!isAdmin(req))return reply(403,{error:'Acceso no autorizado.'});
  try{
   const table=await getStore(), items=[];
@@ -65,7 +85,7 @@ app.http('adminMessages',{route:'admin/messages',methods:['GET'],authLevel:'anon
   return reply(200,{items});
  }catch(e){logError(context,e);return reply(503,{error:'No se pudo acceder al almacenamiento.'});}
 }});
-app.http('adminMessageAction',{route:'admin/messages/{id}',methods:['PATCH','DELETE'],authLevel:'anonymous',handler:async(req,context)=>{
+registerFirebaseTwin('adminMessageAction',{route:'admin/messages/{id}',methods:['PATCH','DELETE'],authLevel:'anonymous',handler:async(req,context)=>{
  if(!isAdmin(req))return reply(403,{error:'Acceso no autorizado.'});
  const id=req.params.id;
  if(!/^[0-9a-f-]{36}$/.test(id||''))return reply(400,{error:'Identificador inválido.'});
