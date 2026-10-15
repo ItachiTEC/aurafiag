@@ -8,7 +8,7 @@
     "build": "node scripts/build.mjs",
     "start": "node scripts/serve.mjs",
     "check": "node scripts/check.mjs",
-    "test": "node scripts/test-api.cjs && node scripts/test-cms.cjs && node scripts/test-auth.cjs && node scripts/test-functions-bootstrap.cjs && node scripts/test-firebase-auth.cjs && node scripts/test-firebase-ui.cjs"
+    "test": "node scripts/test-api.cjs && node scripts/test-cms.cjs && node scripts/test-auth.cjs && node scripts/test-functions-bootstrap.cjs && node scripts/test-firebase-auth.cjs && node scripts/test-firebase-ui.cjs && node scripts/test-firebase-private.cjs"
   },
   "engines": {
     "node": ">=20"
