@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict');
+const {readFileSync,existsSync}=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const file=x=>readFileSync(path.join(root,x),'utf8');
+const config=JSON.parse(file('src/staticwebapp.config.json'));
+for(const name of ['src/login/index.html','src/403.html','src/assets/auth.css','src/assets/auth.js'])assert(existsSync(path.join(root,name)),'Missing auth file: '+name);
+assert(config.routes.some(x=>x.route==='/admin*'&&x.allowedRoles?.includes('administrator')),'Admin pages need administrator role');
+assert(config.routes.some(x=>x.route==='/api/admin/*'&&x.allowedRoles?.includes('administrator')),'Admin APIs need administrator role');
+assert.equal(config.responseOverrides['401'].redirect,'/login/');
+assert.equal(config.responseOverrides['403'].rewrite,'/403.html');
+assert(!config.routes.some(x=>x.route==='/admin*'&&x.allowedRoles?.includes('authenticated')),'Logging in must NOT grant CMS access');
+const login=file('src/login/index.html');
+const forbidden=file('src/403.html');
+const auth=file('src/assets/auth.js');
+for(const html of [login,forbidden]){
+ assert(html.includes('id="auth-status"'));
+ assert(html.includes('id="auth-signin"'));
+ assert(html.includes('id="auth-enter"'));
+ assert(html.includes('id="auth-signout"'));
+ assert(html.includes('id="auth-help"'));
+ assert(html.includes('/assets/auth.js'));
+ assert(html.includes('/assets/auth.css'));
+}
+assert(auth.includes("/.auth/me"),'Must read Azure session');
+assert(auth.includes("roles.includes('administrator')"),'Must check custom role');
+assert(auth.includes('/.auth/login/github'), 'Must authenticate using Azure GitHub provider');
+assert(auth.includes('/.auth/logout'), 'Must allow signing out');
+assert(!login.includes('type="password"'), 'Do not build an ad-hoc password system');
+assert(file('src/assets/app.js').includes('href="/login/"'), 'Must link to team login from main website');
+console.log('AURA Access: login, roles, 401/403 and protected admin validated.');
