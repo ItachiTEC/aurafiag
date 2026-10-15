@@ -1,71 +1,155 @@
-/* Acceso Firebase a AURA: identidad; no concede permisos de edición por sí solo. */
+/* AURA · Acceso Firebase de prueba.
+ * Autenticar NO autoriza automáticamente el CMS. Los permisos se validan en servidor.
+ */
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
-import {getAuth,signInWithEmailAndPassword,sendPasswordResetEmail,sendEmailVerification,signOut,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+import {getAuth,signInWithEmailAndPassword,sendPasswordResetEmail,sendEmailVerification,signOut,onAuthStateChanged,reload} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {firebaseConfig} from '/assets/firebase-config.js';
 
+window.__auraFirebaseModuleReady=true;
 const app=initializeApp(firebaseConfig);
 const auth=getAuth(app);
 auth.languageCode='es';
-const form=document.getElementById('firebase-login-form');
-const emailInput=document.getElementById('fb-email');
-const passwordInput=document.getElementById('fb-password');
-const submit=document.getElementById('fb-login-submit');
-const status=document.getElementById('fb-status');
-const actions=document.getElementById('fb-actions');
-const verify=document.getElementById('fb-verify-email');
-const logout=document.getElementById('fb-logout');
-const reset=document.getElementById('fb-reset');
-function state(message,warning=false){status.textContent=message;status.classList.toggle('auth-status-warning',warning);status.classList.toggle('auth-status-ok',!warning);}
-function friendly(error){
- const code=String(error?.code||'');
- const texts={
-  'auth/invalid-credential':'Credenciales incorrectas. Comprueba el correo y la contraseña.',
-  'auth/invalid-email':'El correo no es válido.',
-  'auth/too-many-requests':'Demasiados intentos. Espera e inténtalo después.',
-  'auth/user-disabled':'Esta cuenta ha sido desactivada.',
-  'auth/network-request-failed':'No se pudo conectar con Firebase.',
-  'auth/operation-not-allowed':'Activa Correo electrónico/contraseña en Firebase Authentication.',
-  'auth/unauthorized-domain':'Agrega el dominio de AURA en Firebase Authentication → Authorized domains.'
- };
- return texts[code]||'No se pudo completar la operación. Revisa la configuración de Firebase.';
+const byId=id=>document.getElementById(id);
+const form=byId('firebase-login-form');
+const emailInput=byId('fb-email');
+const passwordInput=byId('fb-password');
+const submit=byId('fb-login-submit');
+const status=byId('fb-status');
+const actions=byId('fb-actions');
+const verify=byId('fb-verify-email');
+const recheck=byId('fb-recheck-email');
+const logout=byId('fb-logout');
+const reset=byId('fb-reset');
+
+function notice(message,{warning=false,ok=false}={}){
+ status.textContent=message;
+ status.classList.toggle('auth-status-warning',warning);
+ status.classList.toggle('auth-status-ok',ok);
 }
-form.addEventListener('submit',async e=>{
- e.preventDefault();
+function errorInfo(error){
+ const code=String(error?.code||'');
+ const dictionary={
+  'auth/invalid-credential':'Correo o contraseña incorrectos. Comprueba que la cuenta esté creada en Authentication → Users.',
+  'auth/wrong-password':'Correo o contraseña incorrectos.',
+  'auth/user-not-found':'No encontramos esta cuenta. Revísala en Firebase Authentication → Users.',
+  'auth/invalid-email':'El correo electrónico no es válido.',
+  'auth/too-many-requests':'Firebase bloqueó temporalmente los intentos. Espera y utiliza Recuperar contraseña si corresponde.',
+  'auth/user-disabled':'Esta cuenta está desactivada en Firebase Authentication.',
+  'auth/network-request-failed':'No hay conexión con Firebase. Prueba con Chrome o Safari y revisa tu conexión.',
+  'auth/operation-not-allowed':'Activa Email/Password en Firebase Authentication → Sign-in method.',
+  'auth/configuration-not-found':'No está configurado el proveedor Email/Password para este proyecto.',
+  'auth/unauthorized-domain':'Añade el dominio de esta página en Firebase Authentication → Authorized domains.',
+  'auth/api-key-not-valid':'La configuración API del proyecto Firebase no está funcionando.',
+  'auth/invalid-api-key':'La clave de configuración pública de Firebase es incorrecta.',
+  'auth/quota-exceeded':'Se alcanzó temporalmente un límite de Firebase. Reintenta más tarde.',
+  'auth/requires-recent-login':'Por seguridad, cierra sesión y vuelve a entrar.',
+  'auth/invalid-action-code':'Enlace de verificación vencido o usado. Solicita uno nuevo.'
+ };
+ const description=dictionary[code]||'Firebase rechazó la operación. Si persiste, informa el código mostrado.';
+ return description+(code?' (Código: '+code+')':'');
+}
+function showForm(){
+ form.hidden=false;
+ actions.hidden=true;
+}
+function showUser(email){
+ form.hidden=true;
+ actions.hidden=false;
+ byId('fb-account').textContent='Sesión de: '+email;
+}
+async function diagnoseUser(user,{refresh=false}={}){
+ showUser(user.email||'cuenta Firebase');
+ if(refresh){
+  try{await reload(user);}catch(e){notice(errorInfo(e),{warning:true});return;}
+ }
+ if(!user.emailVerified){
+  notice('Inicio de sesión correcto. Ahora debes verificar tu correo. Pulsa «Enviar verificación», abre el mensaje y después «Ya verifiqué mi correo».',{warning:true});
+  verify.hidden=false;
+  recheck.hidden=false;
+  return;
+ }
+ verify.hidden=true;
+ recheck.hidden=true;
+ notice('Inicio de sesión correcto y correo verificado. Comprobando tu rol en AURA…');
+ try{
+  const token=await user.getIdToken(true);
+  const response=await fetch('/api/firebase-auth-check',{
+   method:'GET',
+   headers:{'Authorization':'Bearer '+token},
+   cache:'no-store',
+   signal:AbortSignal.timeout(12000)
+  });
+  if(response.status===404){
+   notice('¡Firebase inició sesión correctamente! Falta publicar o reparar la API /api/firebase-auth-check de Azure. No es un problema de contraseña.',{warning:true});
+   return;
+  }
+  if(response.status===401||response.status===403){
+   notice('¡Firebase inició sesión correctamente! Azure todavía no ha aprobado o validado tu acceso. No es un error de contraseña. (HTTP '+response.status+')',{warning:true});
+   return;
+  }
+  if(response.status===503){
+   notice('¡Firebase inició sesión correctamente! La API de Azure no logró verificar el token. Comprueba la ejecución de Azure Functions.',{warning:true});
+   return;
+  }
+  if(!response.ok){
+   notice('¡Firebase inició sesión correctamente! Falló la comprobación del servidor (HTTP '+response.status+').',{warning:true});
+   return;
+  }
+  const result=await response.json();
+  if(result.authorized){
+   notice('¡Cuenta verificada! Rol AURA: '+result.role+'. Esta versión es una prueba de acceso; el panel privado todavía necesita completar su integración.',{ok:true});
+  }else{
+   notice('¡Inicio de sesión correcto! Tu cuenta aún no tiene un rol de AURA (administrator/editor/viewer). Debe asignarlo la administración mediante un procedimiento seguro; el CMS permanece restringido.',{warning:true});
+  }
+ }catch(error){
+  const label=error?.name==='TimeoutError'?'La API tardó demasiado':'No se pudo consultar la API de Azure';
+  notice('¡Firebase inició sesión correctamente! '+label+'. El acceso al editor sigue pendiente, pero no necesitas restablecer tu contraseña.',{warning:true});
+ }
+}
+
+form.addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(!form.reportValidity())return;
  const email=emailInput.value.trim();
- if(!email||!passwordInput.value)return;
- submit.disabled=true;state('Validando la cuenta con Firebase…');
+ submit.disabled=true;
+ notice('Comprobando correo y contraseña en Firebase…');
  try{
   await signInWithEmailAndPassword(auth,email,passwordInput.value);
   passwordInput.value='';
- }catch(err){state(friendly(err),true);}
- finally{submit.disabled=false;}
+ }catch(error){
+  notice(errorInfo(error),{warning:true});
+ }finally{submit.disabled=false;}
 });
 reset.addEventListener('click',async()=>{
  const email=emailInput.value.trim();
- if(!email){state('Escribe primero tu correo para recuperar la contraseña.',true);return;}
- try{await sendPasswordResetEmail(auth,email);state('Si la cuenta existe, recibirás instrucciones para recuperar el acceso.');}
- catch(err){state(friendly(err),true);}
+ if(!email){notice('Escribe primero tu correo y pulsa Recuperar contraseña.',{warning:true});emailInput.focus();return;}
+ try{
+  await sendPasswordResetEmail(auth,email);
+  notice('Si la cuenta existe, recibirás un correo para recuperar la contraseña.',{ok:true});
+ }catch(error){notice(errorInfo(error),{warning:true});}
 });
 verify.addEventListener('click',async()=>{
- if(!auth.currentUser)return;
- try{await sendEmailVerification(auth.currentUser);state('Se envió la verificación. Abre el correo y vuelve a entrar.');}
- catch(err){state(friendly(err),true);}
+ const user=auth.currentUser;
+ if(!user)return;
+ verify.disabled=true;
+ try{
+  await sendEmailVerification(user);
+  notice('Verificación enviada. Abre el correo, usa el enlace y luego pulsa «Ya verifiqué mi correo».');
+ }catch(error){notice(errorInfo(error),{warning:true});}
+ finally{verify.disabled=false;}
+});
+recheck.addEventListener('click',async()=>{
+ const user=auth.currentUser;
+ if(user)await diagnoseUser(user,{refresh:true});
 });
 logout.addEventListener('click',async()=>{
- await signOut(auth);form.hidden=false;actions.hidden=true;state('Sesión cerrada. Puedes iniciar sesión con otra cuenta.');
+ try{await signOut(auth);showForm();notice('Sesión cerrada. Ahora puedes acceder con otra cuenta.');}
+ catch(error){notice(errorInfo(error),{warning:true});}
 });
-onAuthStateChanged(auth,async user=>{
- if(!user){form.hidden=false;actions.hidden=true;state('Ingresa con el correo y la contraseña que te asignaron.');return;}
- form.hidden=true;actions.hidden=false;
- if(!user.emailVerified){state('Sesión iniciada. Falta verificar el correo para solicitar acceso al panel.',true);return;}
- state('Correo verificado. Comprobando autorización en el servidor…');
- try{
-  const token=await user.getIdToken(true);
-  const response=await fetch('/api/firebase-auth-check',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
-  if(response.status===404){state('Firebase inició sesión, pero Azure todavía no tiene disponible la API de comprobación. El CMS sigue protegido.',true);return;}
-  const data=await response.json();
-  if(!response.ok){state('No se pudo comprobar el acceso del encargado. La edición sigue deshabilitada.',true);return;}
-  if(data.authorized){state('Identidad verificada. Rol reconocido: '+data.role+'. La activación del nuevo panel aún está pendiente.');}
-  else{state('Sesión válida, pero todavía no tienes rol AURA de editor o administrador. Debe asignarlo un encargado autorizado.',true);}
- }catch{state('Sesión en Firebase, pero no se pudo verificar la autorización con Azure. Intenta más tarde.',true);}
+onAuthStateChanged(auth,user=>{
+ if(!user){showForm();notice('Escribe la cuenta creada en Firebase Authentication → Users.');return;}
+ diagnoseUser(user).catch(()=>notice('Error al comprobar la cuenta. Reintenta iniciar sesión.',{warning:true}));
+},error=>{
+ showForm();
+ notice(errorInfo(error),{warning:true});
 });
