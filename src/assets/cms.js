@@ -274,7 +274,10 @@ export async function mountCmsAdmin(root,{firebaseToken=null}={}){
   }catch(e){
    connected=false;
    if(e.status===404)connectionIssue='Error 404: Azure no encontró la ruta '+(firebaseTokenProvider?'/api/firebase-admin/content':'/api/admin/content')+'. No es un fallo de contraseña ni significa que Storage esté desconectado. Puede tratarse de funciones no registradas o de despliegue de API pendiente.';
-   else if(e.status===503)connectionIssue='Error 503: la ruta existe, pero Azure no pudo abrir Table Storage. Revisa AURA_STORAGE_CONNECTION_STRING y que tu cuenta permita tablas.';
+   else if(e.status===503){
+    if(/autorización administrativa/i.test(e.message))connectionIssue='Error 503: Firebase Admin SDK todavía no puede comprobar sesiones con revocación. Revisa AURA_FIREBASE_SERVICE_ACCOUNT_JSON en las variables de entorno del despliegue de prueba de Azure. El servidor se detuvo antes de consultar Table Storage.';
+    else connectionIssue='Error 503: Azure no pudo abrir el almacenamiento de contenidos. Revisa AURA_STORAGE_CONNECTION_STRING, la disponibilidad de Azure Tables y los registros del servidor.';
+   }
    else if(e.status===401||e.status===403)connectionIssue='Acceso restringido al servicio de contenidos. Comprueba que la cuenta tiene el rol administrator y vuelve a iniciar sesión.';
    else connectionIssue='Error de comunicación ('+(e.status||'red')+'). Comprueba las funciones de Azure y reintenta.';
    say('No se pudo abrir el editor: '+e.message,true);
