@@ -17,13 +17,15 @@ Module._load=function(name,parent,isMain){
 require('../api/src/functions/firebase-auth.js');
 const h=handlers.firebaseAuthCheck?.handler;
 assert(h,'Firebase check function not registered');
-const req=v=>({headers:{get:k=>k==='authorization'?v:''}});
+const req=v=>({headers:{get:k=>k==='x-aura-firebase-token'?v:''}});
 const ctx={error:()=>{}};
 (async()=>{
- let res=await h(req(''),ctx);assert.equal(res.status,401);
- res=await h(req('Bearer '+'x'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.authorized,true);assert.equal(res.jsonBody.role,'editor');
- res=await h(req('Bearer '+'y'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.authorized,false);
- res=await h(req('Bearer '+'z'.repeat(120)),ctx);assert.equal(res.status,403);
- res=await h(req('Bearer '+'q'.repeat(120)),ctx);assert.equal(res.status,401);
+ let res=await h(req(''),ctx);assert.equal(res.status,401);assert.equal(res.jsonBody.reason,'firebase-token-missing');
+ const swappTokenOnly={headers:{get:k=>k==='authorization'?'Bearer '+'x'.repeat(120):''}};
+ res=await h(swappTokenOnly,ctx);assert.equal(res.status,401,'Azure platform token must NEVER authorize the Firebase route');
+ res=await h(req('x'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.authorized,true);assert.equal(res.jsonBody.role,'editor');
+ res=await h(req('y'.repeat(120)),ctx);assert.equal(res.status,200);assert.equal(res.jsonBody.authorized,false);
+ res=await h(req('z'.repeat(120)),ctx);assert.equal(res.status,403);
+ res=await h(req('q'.repeat(120)),ctx);assert.equal(res.status,401);
  console.log('Firebase: token requerido, rol y correo verificado, rechazo seguro OK');
 })().catch(e=>{console.error(e);process.exit(1);}).finally(()=>{Module._load=orig;});
