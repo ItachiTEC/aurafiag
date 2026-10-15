@@ -171,7 +171,7 @@ app.http('publicMedia',{route:'media/{name}',methods:['GET'],authLevel:'anonymou
   }catch(sasError){
    // Algunos tipos de credenciales no permiten SAS. En esos entornos usamos
    // la respuesta binaria original sin cambiar las rutas de publicaciones.
-   context.warn('AURA media SAS fallback: '+String(sasError?.code||sasError?.name||'UnsupportedCredential'));
+   context.warn?.('AURA media SAS fallback: '+String(sasError?.code||sasError?.name||'UnsupportedCredential'));
    const download=await blob.downloadToBuffer(0,MAX_IMAGE_BYTES+1);
    if(download.length>MAX_IMAGE_BYTES)return ok(413,{error:'Imagen demasiado grande.'});
    const mime=name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':'image/webp';
