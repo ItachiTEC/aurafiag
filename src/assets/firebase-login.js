@@ -83,7 +83,7 @@ async function diagnoseUser(user,{refresh=false}={}){
   if(run!==activeDiagnosis)return;
   const response=await fetch('/api/firebase-auth-check',{
    method:'GET',
-   headers:{'Authorization':'Bearer '+token},
+   headers:{'X-AURA-Firebase-Token':token},
    cache:'no-store',
    signal:AbortSignal.timeout(12000)
   });
@@ -93,7 +93,17 @@ async function diagnoseUser(user,{refresh=false}={}){
    return;
   }
   if(response.status===401||response.status===403){
-   notice('¡Firebase inició sesión correctamente! Azure todavía no ha aprobado o validado tu acceso. No es un error de contraseña. (HTTP '+response.status+')',{warning:true});
+   let detail={};
+   try{detail=await response.json();}catch{}
+   if(detail.reason==='firebase-token-missing'){
+    notice('Firebase inició sesión, pero el token no llegó al servidor. Comprueba que el despliegue esté actualizado. (HTTP 401)',{warning:true});
+   }else if(detail.reason==='firebase-token-invalid'){
+    notice('Firebase inició sesión, pero el servidor rechazó el token de identidad. Cierra sesión, vuelve a ingresar y comprueba el proyecto de Firebase. (HTTP 401)',{warning:true});
+   }else if(detail.reason==='verify-email'){
+    notice('Firebase requiere verificar tu correo electrónico. Cierra sesión y vuelve a entrar tras verificarlo.',{warning:true});
+   }else{
+    notice('El servicio de Azure rechazó la comprobación. No es un error de tu contraseña. (HTTP '+response.status+')',{warning:true});
+   }
    return;
   }
   if(response.status===503){
