@@ -64,14 +64,77 @@ async function call(url,config){
  if(!response.ok){const e=Error(data.error||'Error '+response.status);e.status=response.status;throw e;}
  return data;
 }
+// Aceptar originales de cámara grandes y generar un archivo optimizado antes
+// de enviarlo a Azure (sin aumentar el consumo de ancho de banda público).
+const MAX_SOURCE_IMAGE_BYTES=20*1024*1024;
+const MAX_STORED_IMAGE_BYTES=2*1024*1024;
 async function encodeFile(file){
  return new Promise((resolve,reject)=>{
   const reader=new FileReader();
-  reader.onerror=()=>reject(Error('No se pudo leer el archivo'));
+  reader.onerror=()=>reject(Error('No se pudo leer la imagen.'));
   reader.onload=()=>resolve(String(reader.result).split(',')[1]);
   reader.readAsDataURL(file);
  });
 }
+async function loadPicture(file){
+ if(typeof createImageBitmap==='function'){
+  try{return await createImageBitmap(file);}catch{/* Compatibilidad con otros navegadores */}
+ }
+ const url=URL.createObjectURL(file);
+ try{
+  return await new Promise((resolve,reject)=>{
+   const picture=new Image();
+   picture.onload=()=>resolve(picture);
+   picture.onerror=()=>reject(Error('No se pudo abrir la imagen. Usa JPEG, PNG o WebP.'));
+   picture.src=url;
+  });
+ }finally{URL.revokeObjectURL(url);}
+}
+async function canvasBlob(canvas,quality){
+ return new Promise(resolve=>{
+  canvas.toBlob(resolve,'image/webp',quality);
+ });
+}
+async function optimizedUpload(file){
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Selecciona una foto JPEG, PNG o WebP.');
+ if(file.size>MAX_SOURCE_IMAGE_BYTES)throw Error('El archivo original supera los 20 MB.');
+ if(!file.size)throw Error('El archivo está vacío.');
+ if(file.size<=MAX_STORED_IMAGE_BYTES)return {base64:await encodeFile(file),original:file.size,stored:file.size};
+ const picture=await loadPicture(file);
+ try{
+  const width=picture.width||picture.naturalWidth,height=picture.height||picture.naturalHeight;
+  if(!width||!height||width*height>50_000_000)throw Error('Imagen demasiado grande en resolución. Reduce sus dimensiones antes de subirla.');
+  const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{alpha:true});
+  if(!context)throw Error('Este navegador no puede optimizar imágenes.');
+  for(const edge of [2400,2000,1600,1200,900]){
+   const ratio=Math.min(1,edge/Math.max(width,height));
+   canvas.width=Math.max(1,Math.round(width*ratio));
+   canvas.height=Math.max(1,Math.round(height*ratio));
+   context.clearRect(0,0,canvas.width,canvas.height);
+   context.drawImage(picture,0,0,canvas.width,canvas.height);
+   for(const quality of [0.86,0.72,0.56]){
+    const compressed=await canvasBlob(canvas,quality);
+    if(compressed&&compressed.size<=MAX_STORED_IMAGE_BYTES&&compressed.size>0){
+     return {base64:await encodeFile(compressed),original:file.size,stored:compressed.size};
+    }
+   }
+  }
+  throw Error('No fue posible optimizar la foto a menos de 2 MB. Prueba otra imagen.');
+ }finally{if(typeof picture.close==='function')picture.close();}
+}
+async function checkPublicImage(url){
+ if(!/^\/api\/media\/[0-9a-f-]{36}\.(webp|png|jpg)$/.test(url))throw Error('La API devolvió una ruta de imagen incorrecta.');
+ // Usamos un <img> real y no fetch(): la API puede redirigir a un Blob
+ // temporal en otro dominio donde CORS no tiene por qué estar habilitado.
+ await new Promise((resolve,reject)=>{
+  const img=new Image();
+  const timeout=setTimeout(()=>reject(Error('La imagen tardó demasiado en abrirse desde Azure.')),15000);
+  img.onload=()=>{clearTimeout(timeout);resolve();};
+  img.onerror=()=>{clearTimeout(timeout);reject(Error('Azure guardó la imagen, pero su enlace público no se puede abrir. Intenta re-subirla después de actualizar la página.'));};
+  img.src=url+'?check='+Date.now();
+ });
+}
+
 function allDefaults(){
  prepareIds();
  return {
@@ -198,19 +261,32 @@ export async function mountCmsAdmin(root,{firebaseToken=null}={}){
   if(type==='image'){
    const uploader=el('div','cms-upload');
    const file=el('input');file.type='file';file.accept='image/webp,image/png,image/jpeg';file.setAttribute('aria-label','Archivo para '+label);
-   uploader.append(file,button('Subir imagen','cms-secondary',async()=>{
+   const preview=el('img','cms-upload-preview');
+   preview.alt='Vista previa de la imagen seleccionada';
+   preview.loading='lazy';
+   preview.style.cssText='display:block;width:min(100%,360px);max-height:240px;object-fit:contain;border-radius:10px;margin-top:12px';
+   if(control.value&&/^\/api\/media\/[0-9a-f-]{36}\.(webp|png|jpg)$/.test(control.value)){preview.src=control.value;}
+   else preview.hidden=true;
+   const upload=button('Subir y optimizar imagen','cms-secondary',async()=>{
     const chosen=file.files?.[0];
     if(!chosen){say('Selecciona una imagen.',true);return;}
-    if(chosen.size>2*1024*1024){say('Límite de 2 MB por imagen.',true);return;}
-    say('Subiendo imagen…');
+    upload.disabled=true;
+    say('Optimizando imagen para la web…');
     try{
-     const base64=await encodeFile(chosen);
-     const result=await call('/api/admin/media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64})});
+     const optimized=await optimizedUpload(chosen);
+     say('Enviando imagen optimizada a Azure…');
+     const result=await call('/api/admin/media',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({base64:optimized.base64})});
+     say('Comprobando que la imagen se pueda abrir…');
+     await checkPublicImage(result.url);
      control.value=result.url;
-     say('Imagen subida. Pulsa Guardar para aplicar el cambio.');
-    }catch(e){say(e.message,true);}
-   }));
-   line.append(uploader,el('small',null,'JPEG, PNG o WebP; máximo 2 MB.'));
+     preview.src=result.url;preview.hidden=false;
+     const before=(optimized.original/1024/1024).toFixed(1),after=(optimized.stored/1024/1024).toFixed(1);
+     say('Imagen subida y comprobada ('+before+' MB → '+after+' MB). Pulsa Guardar cambios para aplicarla.');
+    }catch(e){say(e.message||'No se pudo subir la imagen.',true);}
+    finally{upload.disabled=false;}
+   });
+   uploader.append(file,upload,preview);
+   line.append(uploader,el('small',null,'JPEG, PNG o WebP. Originales de hasta 20 MB; optimización automática para una carga rápida.'));
   }
   form.append(line);
  }
