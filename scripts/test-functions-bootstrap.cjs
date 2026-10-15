@@ -21,7 +21,8 @@ for(const [name,route] of [
  ['adminMessageAction','admin/messages/{id}'],['publicContent','content'],
  ['adminContent','admin/content'],['adminContentDelete','admin/content/{type}/{id}'],
  ['adminMediaUpload','admin/media'],['publicMedia','media/{name}'],
- ['cmsHealth','cms-health'],['adminCmsAuthCheck','admin/cms-auth-check'],['adminCmsDiagnostic','admin/cms-diagnostic'],['firebaseAuthCheck','firebase-auth-check']
+ ['cmsHealth','cms-health'],['adminCmsAuthCheck','admin/cms-auth-check'],['adminCmsDiagnostic','admin/cms-diagnostic'],['firebaseAuthCheck','firebase-auth-check'],
+ ['firebaseAdminContent','firebase-admin/content'],['firebaseAdminContentDelete','firebase-admin/content/{type}/{id}'],['firebaseAdminMediaUpload','firebase-admin/media'],['firebaseAdminCmsDiagnostic','firebase-admin/cms-diagnostic'],['firebaseAdminMessages','firebase-admin/messages'],['firebaseAdminMessageAction','firebase-admin/messages/{id}']
 ]){
  assert(registered.has(name),'Missing registration '+name);
  assert.equal(registered.get(name).route,route,name+' route mismatch');
