@@ -5,6 +5,26 @@ const PROJECT_ID='aura-fiag';
 const ROLES=new Set(['administrator','editor','viewer']);
 const response=(status,data)=>({status,jsonBody:data,headers:{'Cache-Control':'no-store','Content-Type':'application/json; charset=utf-8','X-Content-Type-Options':'nosniff'}});
 let firebaseApp;
+function setupStatus(){
+ // Estado de CONFIGURACIÓN, nunca credenciales ni datos del servicio.
+ // Solo se entrega a una sesión Firebase con rol administrator válido.
+ const raw=process.env.AURA_FIREBASE_SERVICE_ACCOUNT_JSON;
+ let serviceCredential='missing';
+ if(raw&&raw.trim()){
+  try{
+   const credential=JSON.parse(raw);
+   if(credential?.project_id!=='aura-fiag')serviceCredential='project-mismatch';
+   else if(typeof credential.client_email!=='string'||!credential.client_email.includes('@')||
+           typeof credential.private_key!=='string'||!credential.private_key.includes('-----BEGIN PRIVATE KEY-----'))
+    serviceCredential='incomplete';
+   else serviceCredential='configured';
+  }catch{serviceCredential='invalid-json';}
+ }
+ return {
+  serviceCredential,
+  storageConfigured:Boolean(process.env.AURA_STORAGE_CONNECTION_STRING)
+ };
+}
 function verifier(){
  const {getApps,initializeApp}=require('firebase-admin/app');
  const {getAuth}=require('firebase-admin/auth');
@@ -20,7 +40,7 @@ app.http('firebaseAuthCheck',{route:'firebase-auth-check',methods:['GET'],authLe
   const claims=await verifier().verifyIdToken(token);
   if(!claims.email_verified)return response(403,{authenticated:true,authorized:false,reason:'verify-email'});
   const role=ROLES.has(claims.aura_role)?claims.aura_role:null;
-  return response(200,{authenticated:true,authorized:Boolean(role),role});
+  return response(200,{authenticated:true,authorized:Boolean(role),role,...(role==='administrator'?{setup:setupStatus()}:{})});
  }catch(error){
   // Invalid session tokens are user errors; unavailable Firebase Admin
   // credentials/project configuration must NOT be reported as a bad password.
