@@ -30,6 +30,23 @@ onAuthStateChanged(auth,async user=>{
   if(!response.ok){say('No se pudo comprobar tu sesión (HTTP '+response.status+'). Regresa al login e inténtalo nuevamente.');return;}
   const data=await response.json();
   if(!data.authorized||data.role!=='administrator'){say('Esta cuenta no tiene rol administrator para gestionar AURA.');return;}
+  // La comprobación pública de tokens puede funcionar sin credenciales de
+  // Firebase Admin. La ruta privada NO: comprueba las variables del entorno.
+  const setup=data.setup;
+  if(setup&&setup.serviceCredential!=='configured'){
+   const detail={
+    'missing':'no recibe la variable AURA_FIREBASE_SERVICE_ACCOUNT_JSON',
+    'invalid-json':'recibe AURA_FIREBASE_SERVICE_ACCOUNT_JSON con un valor que no es JSON válido',
+    'project-mismatch':'recibe credenciales de un proyecto diferente de aura-fiag',
+    'incomplete':'recibe un JSON que no contiene los campos necesarios de la cuenta de servicio'
+   }[setup.serviceCredential]||'no tiene preparada la credencial Firebase Admin';
+   say('El entorno de vista previa de Azure '+detail+'. Revisa Environment variables del entorno PR #7, guarda con Apply dos veces y vuelve a cargar. El panel sigue protegido.');
+   return;
+  }
+  if(setup&&setup.storageConfigured===false){
+   say('La credencial de Firebase Admin ya tiene formato válido, pero el entorno de vista previa no recibe AURA_STORAGE_CONNECTION_STRING. Configura Azure Table/Blob Storage y vuelve a cargar.');
+   return;
+  }
   if(!mounted){
    mounted=true;status.hidden=true;
    await mountCmsAdmin(root,{firebaseToken:()=>user.getIdToken()});
