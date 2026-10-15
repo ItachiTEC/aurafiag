@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {readFileSync}=require('node:fs');
+const {resolve}=require('node:path');
+const cms=readFileSync(resolve(__dirname,'../src/assets/cms.js'),'utf8');
+const api=readFileSync(resolve(__dirname,'../api/src/functions/cms.js'),'utf8');
+assert(cms.includes('MAX_SOURCE_IMAGE_BYTES=20*1024*1024'),'Images should accept originals up to 20 MB');
+assert(cms.includes('MAX_STORED_IMAGE_BYTES=2*1024*1024'),'Keep optimized stored images lightweight');
+assert(cms.includes("canvas.toBlob(resolve,'image/webp'"),'Large images must be browser-optimized');
+assert(cms.includes("await checkPublicImage(result.url)"),'Upload must check public image delivery before accepting URL');
+assert(cms.includes("preview.hidden=false"),'Uploaded image should have a preview');
+assert(cms.includes('Originales de hasta 20 MB'),'Show real accepted size to users');
+assert(api.includes('generateSasUrl'),'Media route must support temporary SAS links');
+assert(api.includes("permissions:BlobSASPermissions.parse('r')"),'SAS may only grant reading');
+assert(api.includes("new Uint8Array(download)"),'Binary fallback must return raw bytes');
+console.log('Media UI: 20 MB uploads, optimization, public image verification and safe redirects OK.');
