@@ -2,7 +2,7 @@
 /* AURA CMS — Azure Tables + private Blob storage. Read: public published content. Write: administrator only. */
 const {app}=require('@azure/functions');
 const {TableClient}=require('@azure/data-tables');
-const {BlobServiceClient}=require('@azure/storage-blob');
+// El cliente Blob se carga solo al subir/leer imágenes; una dependencia de medios nunca debe impedir registrar las rutas de contenido.
 const {randomUUID}=require('node:crypto');
 
 const TYPES=new Set(['proposals','news','team','resources','identity']);
@@ -29,6 +29,7 @@ async function store(){
 async function mediaStore(){
  if(!canStore())throw Error('AURA_STORAGE_CONNECTION_STRING no configurado');
  if(!containerPromise){
+  const {BlobServiceClient}=require('@azure/storage-blob');
   const container=BlobServiceClient.fromConnectionString(process.env.AURA_STORAGE_CONNECTION_STRING).getContainerClient(CONTAINER);
   containerPromise=container.createIfNotExists().then(()=>container).catch(e=>{containerPromise=null;throw e;});
  }
@@ -128,4 +129,16 @@ app.http('publicMedia',{route:'media/{name}',methods:['GET'],authLevel:'anonymou
   const mime=name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':'image/webp';
   return {status:200,body:download,headers:{'Content-Type':mime,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'}};
  }catch(e){if(e.statusCode===404)return ok(404,{error:'Imagen no encontrada.'});serverError(context,e);return ok(503,{error:'Imagen no disponible.'});}
+}});
+
+
+/* Comprobación de registro y conectividad, sin exponer secretos ni información de estudiantes. */
+app.http('cmsHealth',{route:'cms-health',methods:['GET'],authLevel:'anonymous',handler:async()=>ok(200,{ok:true,service:'AURA CMS',apiVersion:'2',routesRegistered:true})});
+app.http('adminCmsDiagnostic',{route:'admin/cms-diagnostic',methods:['GET'],authLevel:'anonymous',handler:async(req,context)=>{
+ const denial=forbid(req);if(denial)return denial;
+ const response={apiRegistered:true,storageConfigured:canStore(),tablesReady:false,blobsReady:false};
+ if(!canStore())return ok(200,response);
+ try{await store();response.tablesReady=true;}catch(e){serverError(context,e);}
+ try{await mediaStore();response.blobsReady=true;}catch(e){serverError(context,e);}
+ return ok(200,response);
 }});

@@ -53,7 +53,7 @@ const button=(label,classname,fn)=>{
 async function call(url,config){
  const response=await fetch(url,Object.assign({cache:'no-store',credentials:'same-origin'},config||{}));
  let data={};try{data=await response.json();}catch{}
- if(!response.ok)throw Error(data.error||'Error '+response.status);
+ if(!response.ok){const e=Error(data.error||'Error '+response.status);e.status=response.status;throw e;}
  return data;
 }
 async function encodeFile(file){
@@ -97,7 +97,7 @@ export async function mountCmsAdmin(root){
  const body=el('div','cms-body');
  dashboard.append(heading,tabs,message,body);
  root.append(dashboard,inbox);
- let model=allDefaults(),connected=false,active='news';
+ let model=allDefaults(),connected=false,active='news',connectionIssue='';
  function say(v,error=false){message.textContent=v;message.classList.toggle('is-error',error);}
  function current(){return model[active]||[];}
  function displayTabs(){
@@ -107,7 +107,7 @@ export async function mountCmsAdmin(root){
  function select(type){active=type;displayTabs();if(type!=='inbox')showList();}
  function showList(){
   body.replaceChildren();
-  if(!connected){body.append(el('p','cms-empty','El editor requiere conexión a Azure Table Storage. Puedes seguir usando Mensajes.'));return;}
+  if(!connected){const alert=el('div','cms-empty');alert.append(el('strong',null,'El editor todavía no está disponible.'),el('p',null,connectionIssue||'Se requiere conexión a la API de contenidos. La bandeja de Mensajes se mantiene aparte.'));const a=el('a','cms-secondary','Ver diagnóstico de API ↗');a.href='/api/cms-health';a.target='_blank';a.rel='noopener noreferrer';alert.append(a,document.createTextNode(' '),button('Reintentar conexión','cms-secondary',connect));body.append(alert);return;}
   if(active==='identity'){edit('site');return;}
   const actions=el('div','cms-bar');const heading=el('div');
   heading.append(el('h3',null,NAMES[active]),el('p',null,'Selecciona un registro o crea uno nuevo.'));
@@ -210,10 +210,24 @@ export async function mountCmsAdmin(root){
  for(const type of Object.keys(NAMES)){
   const t=button(NAMES[type],'cms-tab',()=>select(type));t.dataset.type=type;tabs.append(t);
  }
- select('news');say('Conectando al gestor…');
- try{
-  const response=await call('/api/admin/content');
-  model=applyAdminModel(response.items||[]);
-  connected=true;say('Gestor conectado. Los cambios públicos se actualizan al recargar la página.');select('news');
- }catch(e){say('No se pudo abrir el editor: '+e.message,true);showList();}
+ async function connect(){
+  say('Comprobando el servicio de contenidos…');
+  try{
+   const response=await call('/api/admin/content');
+   model=applyAdminModel(response.items||[]);
+   connected=true;connectionIssue='';
+   say('Gestor conectado. Los cambios publicados aparecen al actualizar la web.');
+   select('news');
+  }catch(e){
+   connected=false;
+   if(e.status===404)connectionIssue='Error 404: Azure no encontró la ruta /api/admin/content. No es un fallo de contraseña ni significa que Storage esté desconectado. Puede tratarse de funciones no registradas o de despliegue de API pendiente.';
+   else if(e.status===503)connectionIssue='Error 503: la ruta existe, pero Azure no pudo abrir Table Storage. Revisa AURA_STORAGE_CONNECTION_STRING y que tu cuenta permita tablas.';
+   else if(e.status===401||e.status===403)connectionIssue='Acceso restringido al servicio de contenidos. Comprueba que la cuenta tiene el rol administrator y vuelve a iniciar sesión.';
+   else connectionIssue='Error de comunicación ('+(e.status||'red')+'). Comprueba las funciones de Azure y reintenta.';
+   say('No se pudo abrir el editor: '+e.message,true);
+   showList();
+  }
+ }
+ select('news');
+ await connect();
 }

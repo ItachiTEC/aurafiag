@@ -27,7 +27,6 @@ Module._load=function(name,parent,isMain){
 };
 process.env.AURA_STORAGE_CONNECTION_STRING='fake-azure-storage';
 require('../api/src/functions/cms.js');
-Module._load=original;
 const administrator={userId:'editor1',userRoles:['authenticated','administrator']};
 const request=(method='GET',body=null,admin=false,params={})=>({
  method,params,headers:{get(key){if(key==='x-ms-client-principal'&&admin)return Buffer.from(JSON.stringify(administrator)).toString('base64');if(key==='content-length')return body?String(JSON.stringify(body).length):'0';return null;}},
@@ -68,4 +67,4 @@ const context={error:()=>{}};
  const dangerous=await registrations.adminMediaUpload(request('POST',{base64:Buffer.from('<svg>fake</svg>').toString('base64')},true),context);
  assert.equal(dangerous.status,400);
  console.log('CMS: admin auth, drafts, publishing, updates, tombstones, image upload and type checks OK.');
-})().catch(e=>{console.error(e);process.exit(1);});
+})().then(()=>{Module._load=original;}).catch(e=>{Module._load=original;console.error(e);process.exit(1);});
