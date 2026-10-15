@@ -72,8 +72,7 @@ async function records(all=false){
  for await (const e of table.listEntities()){
   if(!TYPES.has(e.partitionKey))continue;
   const item=convert(e);if(!item)continue;
-  if(!all&&item.state!=='published'&&!item.deleted)continue;
-  if(!all&&item.deleted&&item.state!=='published')continue;
+  if(!all&&item.state!=='published'){items.push({type:item.type,id:item.id,state:'draft',deleted:true,updatedAt:item.updatedAt,data:{}});continue;}
   items.push(item);
   if(items.length>1200)break;
  }
