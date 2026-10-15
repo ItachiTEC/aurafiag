@@ -151,11 +151,40 @@ app.http('publicMedia',{route:'media/{name}',methods:['GET'],authLevel:'anonymou
  if(!/^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(name||''))return ok(404,{error:'No encontrado.'});
  try{
   const container=await mediaStore(),blob=container.getBlobClient(name);
-  const download=await blob.downloadToBuffer(0,MAX_IMAGE_BYTES+1);
-  if(download.length>MAX_IMAGE_BYTES)return ok(413,{error:'Imagen demasiado grande.'});
-  const mime=name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':'image/webp';
-  return {status:200,body:download,headers:{'Content-Type':mime,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'}};
- }catch(e){if(e.statusCode===404)return ok(404,{error:'Imagen no encontrada.'});serverError(context,e);return ok(503,{error:'Imagen no disponible.'});}
+  // Azure Static Web Apps puede tratar de forma diferente las respuestas
+  // binarias de Functions. Una redirección firmada por poco tiempo entrega la
+  // imagen directamente desde Blob, sin hacer público el contenedor privado.
+  if(!await blob.exists())return ok(404,{error:'Imagen no encontrada.'});
+  try{
+   const {BlobSASPermissions}=require('@azure/storage-blob');
+   const expiresOn=new Date(Date.now()+10*60*1000);
+   const startsOn=new Date(Date.now()-60*1000);
+   const signedUrl=await blob.generateSasUrl({
+    permissions:BlobSASPermissions.parse('r'),
+    startsOn,expiresOn
+   });
+   return {status:302,headers:{
+    'Location':signedUrl,
+    'Cache-Control':'public, max-age=90',
+    'X-Content-Type-Options':'nosniff'
+   }};
+  }catch(sasError){
+   // Algunos tipos de credenciales no permiten SAS. En esos entornos usamos
+   // la respuesta binaria original sin cambiar las rutas de publicaciones.
+   context.warn?.('AURA media SAS fallback: '+String(sasError?.code||sasError?.name||'UnsupportedCredential'));
+   const download=await blob.downloadToBuffer(0,MAX_IMAGE_BYTES+1);
+   if(download.length>MAX_IMAGE_BYTES)return ok(413,{error:'Imagen demasiado grande.'});
+   const mime=name.endsWith('.png')?'image/png':name.endsWith('.jpg')?'image/jpeg':'image/webp';
+   return {status:200,body:new Uint8Array(download),headers:{
+    'Content-Type':mime,'Content-Length':String(download.length),
+    'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'
+   }};
+  }
+ }catch(e){
+  if(e.statusCode===404)return ok(404,{error:'Imagen no encontrada.'});
+  serverError(context,e);
+  return ok(503,{error:'Imagen no disponible. Revisa el acceso a Azure Blob Storage.'});
+ }
 }});
 
 

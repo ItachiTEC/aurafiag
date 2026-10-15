@@ -129,4 +129,16 @@ function newsPageCms(){
 const pageMap={inicio:home,propuestas:()=>{const p=proposals.find(p=>p.id===new URLSearchParams(location.search).get('id'));return p?proposalDetail(p):proposalsListingV3();},fiag:fiagV3,escuela:schoolProfileV3,entradas:newsPageCms,conocenos:about,asamblea:assembly,participa:formPageV3,equipo:teamPageV3,seguimiento:trackingV3,recursos:resourcesPageV3,privacidad:privacy,admin:adminPage};
 const render = pageMap[route] || home;
 const root=document.getElementById('app');
-Promise.resolve(loadPublicCms()).then(()=>render()).then(markup=>{root.innerHTML=markup;wireNav();wireFiltersV3();wireForm();wireParticipationV3();wireResourcesV3();wireAdmin();}).catch(err=>{console.error('AURA no pudo abrir la página',err);});
+function wireCmsImageFallbacks(){
+ for(const img of root.querySelectorAll('.cms-public-article img,.cms-public-card img')){
+  img.addEventListener('error',()=>{
+   const fallback=document.createElement('div');
+   fallback.className='cms-media-fallback';
+   fallback.setAttribute('role','img');
+   fallback.setAttribute('aria-label',img.alt||'Imagen no disponible');
+   fallback.textContent='AURA · Imagen temporalmente no disponible';
+   img.replaceWith(fallback);
+  },{once:true});
+ }
+}
+Promise.resolve(loadPublicCms()).then(()=>render()).then(markup=>{root.innerHTML=markup;wireCmsImageFallbacks();wireNav();wireFiltersV3();wireForm();wireParticipationV3();wireResourcesV3();wireAdmin();}).catch(err=>{console.error('AURA no pudo abrir la página',err);});

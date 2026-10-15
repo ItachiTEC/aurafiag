@@ -13,7 +13,16 @@ class FakeTable{
 class FakeContainer{
  async createIfNotExists(){}
  getBlockBlobClient(name){return {uploadData:async data=>{images.set(name,Buffer.from(data));}};}
- getBlobClient(name){return {downloadToBuffer:async()=>{if(!images.has(name)){const e=Error('Not found');e.statusCode=404;throw e;}return images.get(name);}};}
+ getBlobClient(name){return {
+  exists:async()=>images.has(name),
+  generateSasUrl:async(options)=>{
+   assert.equal(options.permissions,'r');
+   assert(options.expiresOn>options.startsOn);
+   if(globalThis.fakeSasUnsupported)throw Error('Unsupported SAS credentials');
+   return 'https://example.blob.core.windows.net/auramedia/'+name+'?sig=test-only';
+  },
+  downloadToBuffer:async()=>{if(!images.has(name)){const e=Error('Not found');e.statusCode=404;throw e;}return images.get(name);}
+ };}
 }
 class FakeBlob{
  static fromConnectionString(){return new FakeBlob();}
@@ -34,7 +43,7 @@ Module._load=function(name,parent,isMain){
   };
  }} };
  if(name==='@azure/data-tables')return {TableClient:FakeTable};
- if(name==='@azure/storage-blob')return {BlobServiceClient:FakeBlob};
+ if(name==='@azure/storage-blob')return {BlobServiceClient:FakeBlob,BlobSASPermissions:{parse:value=>value}};
  return original.apply(this,arguments);
 };
 process.env.AURA_STORAGE_CONNECTION_STRING='fake-azure-storage';
@@ -82,7 +91,18 @@ const context={error:()=>{}};
  assert.match(upload.jsonBody.url,/^\/api\/media\/[0-9a-f-]+\.jpg$/);
  const path=upload.jsonBody.url.split('/').pop();
  const display=await registrations.publicMedia(request('GET',null,false,{name:path}),context);
- assert.equal(display.status,200);assert.equal(display.body.length,fakeJpg.length);
+ assert.equal(display.status,302,'Private blob should be served by a short-lived signed redirect');
+ assert(display.headers.Location.includes('sig=test-only'));
+ assert(!display.jsonBody,'Do not accidentally encode image data as JSON');
+ const missing=await registrations.publicMedia(request('GET',null,false,{name:'11111111-1111-1111-1111-111111111111.png'}),context);
+ assert.equal(missing.status,404);
+ globalThis.fakeSasUnsupported=true;
+ const binary=await registrations.publicMedia(request('GET',null,false,{name:path}),context);
+ assert.equal(binary.status,200,'Fallback to binary when SAS cannot be generated');
+ assert.equal(binary.headers['Content-Type'],'image/jpeg');
+ assert.equal(binary.headers['Content-Length'],String(fakeJpg.length));
+ assert.deepEqual(Buffer.from(binary.body),fakeJpg);
+ globalThis.fakeSasUnsupported=false;
  const dangerous=await registrations.adminMediaUpload(request('POST',{base64:Buffer.from('<svg>fake</svg>').toString('base64')},true),context);
  assert.equal(dangerous.status,400);
  console.log('CMS: admin auth, drafts, publishing, updates, tombstones, image upload and type checks OK.');
