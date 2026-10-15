@@ -40,7 +40,7 @@ onAuthStateChanged(auth,async user=>{
     'project-mismatch':'recibe credenciales de un proyecto diferente de aura-fiag',
     'incomplete':'recibe un JSON que no contiene los campos necesarios de la cuenta de servicio'
    }[setup.serviceCredential]||'no tiene preparada la credencial Firebase Admin';
-   say('El entorno de vista previa de Azure '+detail+'. Revisa Environment variables del entorno PR #7, guarda con Apply dos veces y vuelve a cargar. El panel sigue protegido.');
+   say('Este entorno de Azure '+detail+'. Revisa Environment variables del entorno correspondiente, guarda con Apply dos veces y vuelve a cargar. El panel sigue protegido.');
    return;
   }
   if(setup&&setup.storageConfigured===false){
